@@ -29,7 +29,7 @@ export function Nav({ role }: NavProps) {
   ];
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
+    <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white print:hidden">
       <div className="border-b border-slate-200 px-5 py-5">
         <BrandMark size="md" />
         <div className="mt-2 text-xs text-slate-500">Control de Horas Extras</div>

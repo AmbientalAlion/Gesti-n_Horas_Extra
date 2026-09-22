@@ -4,6 +4,7 @@ import type { EmployeeDetail as Detail } from "@/lib/aggregate";
 import { RULES } from "@/lib/overtime";
 import { StatusBadge } from "./StatusBadge";
 import { BudgetBar } from "./BudgetBar";
+import { PrintButton } from "./PrintButton";
 import { FigureCluster } from "./brand/Figures";
 
 const MONTHS = [
@@ -29,9 +30,12 @@ export function EmployeeDetailView({
 
   return (
     <div className="space-y-6">
-      <Link href={backHref} className="text-sm text-brand hover:text-brand-dark">
-        ← Volver al dashboard
-      </Link>
+      <div className="flex items-center justify-between print:hidden">
+        <Link href={backHref} className="text-sm text-brand hover:text-brand-dark">
+          ← Volver al dashboard
+        </Link>
+        <PrintButton label="Exportar ficha a PDF" />
+      </div>
 
       {/* Cabecera / identidad */}
       <header className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-6 py-5">

@@ -1,4 +1,5 @@
 import { DashboardView } from "@/components/DashboardView";
+import { PrintButton } from "@/components/PrintButton";
 import { demoDashboard } from "@/lib/demo";
 import type { Role } from "@/lib/types";
 
@@ -30,6 +31,7 @@ export default function DemoDashboard({
       scopeLabel={ROLE_LABEL[role]}
       hrefBase="/demo/empleado"
       roleParam={role}
+      toolbar={<PrintButton />}
     />
   );
 }

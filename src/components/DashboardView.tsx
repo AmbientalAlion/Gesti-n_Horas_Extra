@@ -1,5 +1,5 @@
 import { StatCard } from "./StatCard";
-import { EmployeeTable } from "./EmployeeTable";
+import { FilterableEmployeeTable } from "./FilterableEmployeeTable";
 import { DonutChart } from "./charts/DonutChart";
 import { TrendChart } from "./charts/TrendChart";
 import { HBarChart } from "./charts/HBarChart";
@@ -22,6 +22,7 @@ export function DashboardView({
   scopeLabel,
   hrefBase,
   roleParam,
+  toolbar,
 }: {
   statuses: EmployeeStatus[];
   summary: PlantSummary;
@@ -30,6 +31,7 @@ export function DashboardView({
   scopeLabel: string;
   hrefBase: string;
   roleParam?: string;
+  toolbar?: React.ReactNode;
 }) {
   const critical = statuses
     .filter((s) => s.level === "red")
@@ -60,12 +62,15 @@ export function DashboardView({
     <div className="space-y-6">
       <header className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-6 py-5">
         <FigureCluster />
-        <div className="relative">
-          <h1 className="text-2xl font-bold text-brand-dark">Panel de control</h1>
-          <p className="text-sm text-slate-500">
-            {scopeLabel} · Semana {period.week} · {MONTHS[period.month - 1]}{" "}
-            {period.year}
-          </p>
+        <div className="relative flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-brand-dark">Panel de control</h1>
+            <p className="text-sm text-slate-500">
+              {scopeLabel} · Semana {period.week} · {MONTHS[period.month - 1]}{" "}
+              {period.year}
+            </p>
+          </div>
+          {toolbar && <div className="flex items-center gap-2">{toolbar}</div>}
         </div>
       </header>
 
@@ -277,7 +282,11 @@ export function DashboardView({
         <h2 className="mb-3 text-lg font-semibold text-brand-dark">
           Detalle por empleado
         </h2>
-        <EmployeeTable rows={statuses} hrefBase={hrefBase} roleParam={roleParam} />
+        <FilterableEmployeeTable
+          rows={statuses}
+          hrefBase={hrefBase}
+          roleParam={roleParam}
+        />
       </section>
     </div>
   );

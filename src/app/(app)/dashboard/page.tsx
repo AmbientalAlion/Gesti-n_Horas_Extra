@@ -1,11 +1,22 @@
 import { DashboardView } from "@/components/DashboardView";
-import { getDashboardData } from "@/lib/data";
+import { MonthSelector } from "@/components/MonthSelector";
+import { PrintButton } from "@/components/PrintButton";
+import { currentPeriod, getDashboardData } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
-  const { statuses, summary, charts, period, demo, role } =
-    await getDashboardData();
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { mes?: string; anio?: string };
+}) {
+  const cur = currentPeriod();
+  const month = Number(searchParams.mes) || cur.month;
+  const year = Number(searchParams.anio) || cur.year;
+  const period = { year, month, week: cur.week };
+
+  const { statuses, summary, charts, demo, role } =
+    await getDashboardData(period);
 
   const scopeLabel = role === "jefe" ? "Mi equipo" : "Planta completa";
 
@@ -24,6 +35,12 @@ export default async function DashboardPage() {
         period={period}
         scopeLabel={scopeLabel}
         hrefBase="/empleado"
+        toolbar={
+          <>
+            <MonthSelector year={year} month={month} />
+            <PrintButton />
+          </>
+        }
       />
     </div>
   );

@@ -12,7 +12,7 @@ export default function DemoLayout({
         <DemoNav />
       </Suspense>
       <main className="flex-1 overflow-x-hidden">
-        <div className="bg-brand px-6 py-2 text-center text-xs font-medium text-white">
+        <div className="bg-brand px-6 py-2 text-center text-xs font-medium text-white print:hidden">
           MODO DEMOSTRACIÓN · datos de ejemplo · use el selector «Ver como» para
           cambiar de rol
         </div>
