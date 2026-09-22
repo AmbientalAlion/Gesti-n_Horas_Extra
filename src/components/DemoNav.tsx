@@ -17,6 +17,8 @@ const LINKS = [
   { href: "/demo/dashboard", label: "Dashboard" },
   { href: "/demo/upload", label: "Cargar CSV" },
   { href: "/demo/export", label: "Exportar" },
+  { href: "/demo/revisiones", label: "Revisiones" },
+  { href: "/demo/admin", label: "Usuarios" },
 ];
 
 export function DemoNav() {

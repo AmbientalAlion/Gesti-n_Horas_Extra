@@ -21,12 +21,14 @@ const ROLE_LABELS: Record<Role | "demo", string> = {
 
 export function Nav({ role }: NavProps) {
   const pathname = usePathname();
-  const canUpload = role === "rrhh" || role === "demo";
+  const isRrhh = role === "rrhh" || role === "demo";
 
   const links = [
     { href: "/dashboard", label: "Dashboard" },
-    ...(canUpload ? [{ href: "/upload", label: "Cargar CSV" }] : []),
+    ...(isRrhh ? [{ href: "/upload", label: "Cargar CSV" }] : []),
     { href: "/export", label: "Exportar" },
+    ...(isRrhh ? [{ href: "/revisiones", label: "Revisiones" }] : []),
+    ...(isRrhh ? [{ href: "/admin", label: "Usuarios" }] : []),
   ];
 
   return (
