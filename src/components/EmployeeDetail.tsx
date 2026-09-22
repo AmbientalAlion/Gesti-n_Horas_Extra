@@ -56,6 +56,16 @@ export function EmployeeDetailView({
               <span className="rounded-full bg-brand-tint px-3 py-1 text-brand-dark">
                 Área: <strong>{d.employee.area ?? "—"}</strong>
               </span>
+              {d.employee.plant && (
+                <span className="rounded-full bg-brand-tint px-3 py-1 text-brand-dark">
+                  Planta: <strong>{d.employee.plant}</strong>
+                </span>
+              )}
+              {d.employee.costCenter && (
+                <span className="rounded-full bg-brand-tint px-3 py-1 text-brand-dark">
+                  Centro de costo: <strong>{d.employee.costCenter}</strong>
+                </span>
+              )}
               <span className="rounded-full bg-brand-tint px-3 py-1 text-brand-dark">
                 Jefe/Supervisor: <strong>{d.employee.managerName ?? "Sin asignar"}</strong>
               </span>

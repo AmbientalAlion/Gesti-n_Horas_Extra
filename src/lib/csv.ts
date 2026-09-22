@@ -201,6 +201,8 @@ export interface OvertimeWeekly {
   code: string;
   name?: string;
   area?: string;
+  costCenter?: string;
+  plant?: string;
   managerName?: string;
   year: number;
   week: number;
@@ -244,11 +246,13 @@ function toNum(v: unknown): number {
 const COL = {
   nombre: 0,
   identificacion: 1,
+  ceco: 2,
   direccion: 3,
   concepto: 9,
   tiempoH: 12,
   idFecha: 19,
   jefe: 21,
+  division: 24,
 } as const;
 
 function parseIdFecha(v: string): Date | null {
@@ -301,6 +305,8 @@ export function parseOvertimeEventsCsv(content: string): {
         code,
         name: String(cols[COL.nombre] ?? "").trim() || undefined,
         area: String(cols[COL.direccion] ?? "").trim() || undefined,
+        costCenter: String(cols[COL.ceco] ?? "").trim() || undefined,
+        plant: String(cols[COL.division] ?? "").trim() || undefined,
         managerName: String(cols[COL.jefe] ?? "").trim() || undefined,
         year,
         week,

@@ -25,12 +25,12 @@ export function isSupabaseConfigured(): boolean {
 export const DEMO_PERIOD = { year: 2026, month: 6, week: 25 };
 
 export const demoEmployees: EmployeeInput[] = [
-  { id: "e1", code: "1001", name: "Ana Restrepo", area: "Producción", roleTitle: "Operaria", managerId: "m1", managerName: "Jefe Producción" },
-  { id: "e2", code: "1002", name: "Carlos Gómez", area: "Producción", roleTitle: "Operario", managerId: "m1", managerName: "Jefe Producción" },
-  { id: "e3", code: "1003", name: "Diana Torres", area: "Producción", roleTitle: "Operaria", managerId: "m1", managerName: "Jefe Producción" },
-  { id: "e4", code: "2001", name: "Esteban Ruiz", area: "Logística", roleTitle: "Operario", managerId: "m2", managerName: "Jefe Logística" },
-  { id: "e5", code: "2002", name: "Fernanda Díaz", area: "Logística", roleTitle: "Operaria", managerId: "m2", managerName: "Jefe Logística" },
-  { id: "e6", code: "3001", name: "Gustavo León", area: "Mantenimiento", roleTitle: "Técnico", managerId: "m3", managerName: "Jefe Mantenimiento" },
+  { id: "e1", code: "1001", name: "Ana Restrepo", area: "Concretos", plant: "Rionegro", costCenter: "CA7CA00120-PRODUCCIÓN RIONEGRO", roleTitle: "Operaria", managerId: "m1", managerName: "Jefe Producción" },
+  { id: "e2", code: "1002", name: "Carlos Gómez", area: "Concretos", plant: "Rionegro", costCenter: "CA7CA00120-PRODUCCIÓN RIONEGRO", roleTitle: "Operario", managerId: "m1", managerName: "Jefe Producción" },
+  { id: "e3", code: "1003", name: "Diana Torres", area: "Concretos", plant: "Rionegro", costCenter: "CA7CA00122-CALIDAD RIONEGRO", roleTitle: "Operaria", managerId: "m1", managerName: "Jefe Producción" },
+  { id: "e4", code: "2001", name: "Esteban Ruiz", area: "Dirección Industrial", plant: "Río Claro", costCenter: "EC7EC00010-MANTENIMIENTO", roleTitle: "Operario", managerId: "m2", managerName: "Jefe Logística" },
+  { id: "e5", code: "2002", name: "Fernanda Díaz", area: "Dirección Comercial", plant: "Río Claro", costCenter: "EC4000000-LOGÍSTICA", roleTitle: "Operaria", managerId: "m2", managerName: "Jefe Logística" },
+  { id: "e6", code: "3001", name: "Gustavo León", area: "Dirección Industrial", plant: "Bello", costCenter: "EC7EC00020-PRODUCCIÓN", roleTitle: "Técnico", managerId: "m3", managerName: "Jefe Mantenimiento" },
 ];
 
 // Mes 6 de 2026, semanas 23, 24 y 25 (la 25 es la semana en curso).

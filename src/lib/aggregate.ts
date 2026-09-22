@@ -16,6 +16,8 @@ export interface EmployeeInput {
   code: string;
   name?: string;
   area?: string;
+  costCenter?: string;
+  plant?: string;
   roleTitle?: string;
   managerId?: string | null;
   managerName?: string;
@@ -205,6 +207,8 @@ export function buildEmployeeDetail(
       code: status.code,
       name: status.name,
       area: status.area,
+      costCenter: status.costCenter,
+      plant: status.plant,
       roleTitle: status.roleTitle,
       managerId: status.managerId,
       managerName: status.managerName,
@@ -354,6 +358,13 @@ export interface TopEmployee {
   area: string;
 }
 
+export interface GroupOvertime {
+  label: string;
+  overtime: number;
+  count: number;
+  red: number;
+}
+
 export interface HeatmapData {
   areas: string[];
   weeks: number[];
@@ -371,6 +382,8 @@ export interface Reincidente {
 
 export interface DashboardCharts {
   byArea: AreaOvertime[];
+  byCostCenter: GroupOvertime[];
+  byPlant: GroupOvertime[];
   weeklyTrend: WeeklyTrendPoint[];
   topEmployees: TopEmployee[];
   heatmap: HeatmapData;
@@ -394,6 +407,22 @@ export function computeDashboardCharts(
     areaMap.set(area, cur);
   }
   const byArea = [...areaMap.values()].sort((a, b) => b.overtime - a.overtime);
+
+  // Agrupaciones genéricas por centro de costo y planta/sede.
+  const groupBy = (keyFn: (s: EmployeeStatus) => string): GroupOvertime[] => {
+    const m = new Map<string, GroupOvertime>();
+    for (const s of statuses) {
+      const label = keyFn(s) || "Sin asignar";
+      const cur = m.get(label) ?? { label, overtime: 0, count: 0, red: 0 };
+      cur.overtime = round2(cur.overtime + s.monthlyOvertime);
+      cur.count += 1;
+      if (s.level === "red") cur.red += 1;
+      m.set(label, cur);
+    }
+    return [...m.values()].sort((a, b) => b.overtime - a.overtime);
+  };
+  const byCostCenter = groupBy((s) => s.costCenter ?? "");
+  const byPlant = groupBy((s) => s.plant ?? "");
 
   // Tendencia semanal de horas extra (semanas del mes en curso).
   const weekMap = new Map<number, WeeklyTrendPoint>();
@@ -465,7 +494,7 @@ export function computeDashboardCharts(
     })
     .sort((a, b) => b.weeksHigh - a.weeksHigh);
 
-  return { byArea, weeklyTrend, topEmployees, heatmap, reincidentes };
+  return { byArea, byCostCenter, byPlant, weeklyTrend, topEmployees, heatmap, reincidentes };
 }
 
 function groupBy<T, K>(items: T[], key: (item: T) => K): Map<K, T[]> {

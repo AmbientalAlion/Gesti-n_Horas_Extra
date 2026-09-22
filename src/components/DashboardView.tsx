@@ -164,6 +164,34 @@ export function DashboardView({
             }))}
           />
         </div>
+
+        <div className="card">
+          <h2 className="mb-4 text-sm font-semibold text-brand-dark">
+            Horas extra por planta
+          </h2>
+          <HBarChart
+            color="#00CBBF"
+            items={charts.byPlant.map((g) => ({
+              label: g.label,
+              value: g.overtime,
+              sublabel: `${g.count} pers.${g.red ? ` · ${g.red} crítico` : ""}`,
+            }))}
+          />
+        </div>
+
+        <div className="card">
+          <h2 className="mb-4 text-sm font-semibold text-brand-dark">
+            Horas extra por centro de costo
+          </h2>
+          <HBarChart
+            color="#003865"
+            items={charts.byCostCenter.slice(0, 10).map((g) => ({
+              label: g.label,
+              value: g.overtime,
+              sublabel: `${g.count} pers.${g.red ? ` · ${g.red} crítico` : ""}`,
+            }))}
+          />
+        </div>
       </section>
 
       {/* Heatmap área × semana */}

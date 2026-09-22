@@ -86,13 +86,18 @@ export async function POST(request: Request) {
     const supabase = createClient();
 
     // 1. Empleados (por cédula) con jefe (texto) y área.
-    const empByCode = new Map<string, { code: string; name: string | null; area: string | null; manager_name: string | null }>();
+    const empByCode = new Map<
+      string,
+      { code: string; name: string | null; area: string | null; cost_center: string | null; plant: string | null; manager_name: string | null }
+    >();
     for (const r of rows) {
       if (!empByCode.has(r.code)) {
         empByCode.set(r.code, {
           code: r.code,
           name: r.name ?? null,
           area: r.area ?? null,
+          cost_center: r.costCenter ?? null,
+          plant: r.plant ?? null,
           manager_name: r.managerName ?? null,
         });
       }
