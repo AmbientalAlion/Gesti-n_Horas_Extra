@@ -1,7 +1,14 @@
 // Agregaciones para los dashboards: combina empleados + registros semanales
 // con la lógica de negocio para producir el estado (semáforo) y las métricas.
 
-import { evaluateStatus, projectWeek, RULES, round2, sumOvertime } from "./overtime";
+import {
+  evaluateStatus,
+  projectMonth,
+  projectWeek,
+  RULES,
+  round2,
+  sumOvertime,
+} from "./overtime";
 import type { SemaphoreLevel, WeeklyRecord } from "./types";
 
 export interface EmployeeInput {
@@ -17,13 +24,19 @@ export interface EmployeeInput {
 export interface EmployeeStatus extends EmployeeInput {
   weeklyOvertime: number;
   monthlyOvertime: number;
+  /** Horas extra disponibles antes del límite legal mensual (48h). */
+  availableMonthly: number;
   level: SemaphoreLevel;
   reasons: string[];
-  weeklyAlert: boolean;
+  /** Informativo: superó 12h en la semana (permitido). */
+  weeklyHigh: boolean;
   hasError: boolean;
   /** Proyección de la semana actual si el último corte es parcial. */
   projectedWeeklyOvertime?: number;
   willExceedWeekly?: boolean;
+  /** Proyección de cierre de mes (horas extra) y si superaría 48h. */
+  projectedMonthlyOvertime: number;
+  willExceedMonthly: boolean;
 }
 
 export interface PlantSummary {
@@ -33,7 +46,10 @@ export interface PlantSummary {
   red: number;
   withErrors: number;
   totalMonthlyOvertime: number;
-  weeklyAlerts: number;
+  /** Semanas por encima de 12h (informativo, permitido). */
+  weeklyHigh: number;
+  /** Empleados cuya proyección superaría 48h en el mes (aún no en rojo). */
+  atRiskMonthly: number;
 }
 
 export interface Period {
@@ -61,7 +77,7 @@ export interface EmployeeDetail {
   period: Period;
   level: SemaphoreLevel;
   reasons: string[];
-  weeklyAlert: boolean;
+  weeklyHigh: boolean;
   monthlyExceeded: boolean;
   hasError: boolean;
   frozenCount: number;
@@ -86,6 +102,8 @@ export interface EmployeeDetail {
 
   projectedWeeklyOvertime?: number;
   willExceedWeekly?: boolean;
+  projectedMonthlyOvertime: number;
+  willExceedMonthly: boolean;
 
   history: HistoryEntry[];
 
@@ -186,7 +204,7 @@ export function buildEmployeeDetail(
     period,
     level: status.level,
     reasons: status.reasons,
-    weeklyAlert: status.weeklyAlert,
+    weeklyHigh: status.weeklyHigh,
     monthlyExceeded: status.monthlyOvertime > RULES.MONTHLY_OVERTIME_LIMIT,
     hasError: status.hasError,
     frozenCount: monthRecords.filter((r) => r.hasError).length,
@@ -205,6 +223,8 @@ export function buildEmployeeDetail(
     trendDelta,
     projectedWeeklyOvertime: status.projectedWeeklyOvertime,
     willExceedWeekly: status.willExceedWeekly,
+    projectedMonthlyOvertime: status.projectedMonthlyOvertime,
+    willExceedMonthly: status.willExceedMonthly,
     history: historyEntries,
     areaRankPosition,
     areaRankTotal,
@@ -236,8 +256,7 @@ export function computeEmployeeStatuses(
     const weeklyOvertime = weekRecord?.hasError ? 0 : weekRecord?.overtimeHours ?? 0;
     const monthlyOvertime = sumOvertime(monthRecords);
     const hasError = monthRecords.some((r) => r.hasError);
-
-    const status = evaluateStatus(weeklyOvertime, monthlyOvertime);
+    const validMonth = monthRecords.filter((r) => !r.hasError);
 
     let projectedWeeklyOvertime: number | undefined;
     let willExceedWeekly: boolean | undefined;
@@ -250,16 +269,40 @@ export function computeEmployeeStatuses(
       willExceedWeekly = proj.willExceedWeeklyLimit;
     }
 
+    // Base para la proyección mensual: sustituye la semana parcial en curso por
+    // su proyección de cierre semanal, para no subestimar el mes.
+    let overtimeForProjection = monthlyOvertime;
+    if (
+      weekRecord?.isPartial &&
+      !weekRecord.hasError &&
+      projectedWeeklyOvertime != null
+    ) {
+      overtimeForProjection =
+        monthlyOvertime - weekRecord.overtimeHours + projectedWeeklyOvertime;
+    }
+    const monthProj = projectMonth(overtimeForProjection, validMonth.length);
+
+    const status = evaluateStatus(
+      monthlyOvertime,
+      monthProj.projectedMonthlyOvertime,
+      weeklyOvertime
+    );
+
     return {
       ...emp,
       weeklyOvertime,
       monthlyOvertime,
+      availableMonthly: round2(
+        Math.max(0, RULES.MONTHLY_OVERTIME_LIMIT - monthlyOvertime)
+      ),
       level: status.level,
       reasons: status.reasons,
-      weeklyAlert: status.weeklyAlert,
+      weeklyHigh: status.weeklyHigh,
       hasError,
       projectedWeeklyOvertime,
       willExceedWeekly,
+      projectedMonthlyOvertime: monthProj.projectedMonthlyOvertime,
+      willExceedMonthly: status.willExceedMonthly,
     };
   });
 }
@@ -275,7 +318,10 @@ export function summarize(statuses: EmployeeStatus[]): PlantSummary {
     totalMonthlyOvertime: round2(
       statuses.reduce((acc, s) => acc + s.monthlyOvertime, 0)
     ),
-    weeklyAlerts: statuses.filter((s) => s.weeklyAlert).length,
+    weeklyHigh: statuses.filter((s) => s.weeklyHigh).length,
+    atRiskMonthly: statuses.filter(
+      (s) => s.level !== "red" && s.willExceedMonthly
+    ).length,
   };
 }
 
@@ -300,10 +346,27 @@ export interface TopEmployee {
   area: string;
 }
 
+export interface HeatmapData {
+  areas: string[];
+  weeks: number[];
+  values: Record<string, Record<number, number>>;
+  max: number;
+}
+
+export interface Reincidente {
+  id: string;
+  name: string;
+  area: string;
+  level: SemaphoreLevel;
+  weeksHigh: number;
+}
+
 export interface DashboardCharts {
   byArea: AreaOvertime[];
   weeklyTrend: WeeklyTrendPoint[];
   topEmployees: TopEmployee[];
+  heatmap: HeatmapData;
+  reincidentes: Reincidente[];
 }
 
 /** Datos derivados para las visualizaciones del dashboard. */
@@ -350,7 +413,51 @@ export function computeDashboardCharts(
       area: s.area ?? "Sin área",
     }));
 
-  return { byArea, weeklyTrend, topEmployees };
+  // Heatmap área × semana (horas extra del mes en curso).
+  const monthRecs = records.filter(
+    (r) => r.month === period.month && r.year === period.year && !r.hasError
+  );
+  const areaOf = new Map(statuses.map((s) => [s.id, s.area ?? "Sin área"]));
+  const weeksSet = new Set<number>();
+  const values: Record<string, Record<number, number>> = {};
+  let heatMax = 0;
+  for (const r of monthRecs) {
+    const area = areaOf.get(r.employeeId) ?? "Sin área";
+    weeksSet.add(r.week);
+    values[area] = values[area] ?? {};
+    values[area][r.week] = round2((values[area][r.week] ?? 0) + r.overtimeHours);
+    if (values[area][r.week] > heatMax) heatMax = values[area][r.week];
+  }
+  const heatmap: HeatmapData = {
+    areas: [...new Set(byArea.map((a) => a.area))].filter((a) => values[a]),
+    weeks: [...weeksSet].sort((a, b) => a - b),
+    values,
+    max: heatMax,
+  };
+
+  // Reincidentes: empleados con 2+ semanas por encima de 12h en el mes.
+  const highWeeks = new Map<string, number>();
+  for (const r of monthRecs) {
+    if (r.overtimeHours > RULES.WEEKLY_OVERTIME_LIMIT) {
+      highWeeks.set(r.employeeId, (highWeeks.get(r.employeeId) ?? 0) + 1);
+    }
+  }
+  const statusById = new Map(statuses.map((s) => [s.id, s]));
+  const reincidentes: Reincidente[] = [...highWeeks.entries()]
+    .filter(([, n]) => n >= 2)
+    .map(([id, n]) => {
+      const s = statusById.get(id);
+      return {
+        id,
+        name: s?.name ?? s?.code ?? id,
+        area: s?.area ?? "Sin área",
+        level: s?.level ?? "green",
+        weeksHigh: n,
+      };
+    })
+    .sort((a, b) => b.weeksHigh - a.weeksHigh);
+
+  return { byArea, weeklyTrend, topEmployees, heatmap, reincidentes };
 }
 
 function groupBy<T, K>(items: T[], key: (item: T) => K): Map<K, T[]> {

@@ -10,6 +10,7 @@
 
 import type {
   BiometricRow,
+  MonthProjection,
   SemaphoreLevel,
   StatusEvaluation,
   WeeklyProjection,
@@ -32,6 +33,8 @@ export const RULES = {
   ORPHAN_SHIFT_HOURS: 16,
   /** Días laborales considerados por semana para la proyección (burn rate). */
   WORKING_DAYS_PER_WEEK: 6,
+  /** Semanas promedio por mes, para proyectar el cierre mensual. */
+  WEEKS_PER_MONTH: 4.345,
 } as const;
 
 /**
@@ -108,50 +111,64 @@ export function projectWeek(
 }
 
 /**
- * Evalúa el semáforo de un empleado combinando su situación semanal y mensual.
+ * Proyección de cierre de MES (burn rate mensual). A partir de las horas extra
+ * acumuladas y el número de semanas transcurridas, estima el total del mes.
+ */
+export function projectMonth(
+  monthlyOvertimeSoFar: number,
+  weeksElapsed: number
+): MonthProjection {
+  if (weeksElapsed <= 0) {
+    return {
+      weeksElapsed: 0,
+      projectedMonthlyOvertime: round2(Math.max(0, monthlyOvertimeSoFar)),
+      willExceedMonthly: monthlyOvertimeSoFar > RULES.MONTHLY_OVERTIME_LIMIT,
+    };
+  }
+  const avg = monthlyOvertimeSoFar / weeksElapsed;
+  const projected = round2(avg * RULES.WEEKS_PER_MONTH);
+  return {
+    weeksElapsed,
+    projectedMonthlyOvertime: projected,
+    willExceedMonthly: projected > RULES.MONTHLY_OVERTIME_LIMIT,
+  };
+}
+
+/**
+ * Evalúa el semáforo. Regla ALIÓN: el límite DURO es el MENSUAL (48h). Superar
+ * las 12h de una semana está PERMITIDO (solo es informativo); lo que no puede
+ * superarse es el acumulado del mes.
  *
- * 🔴 Rojo (crítico): superó el límite legal (>12h semanales o >48h mensuales).
- * 🟡 Amarillo (preventivo): cerca del límite semanal (>=10h) o mensual (>=40h).
+ * 🔴 Rojo (crítico): superó las 48h extra del mes.
+ * 🟡 Amarillo (preventivo): cerca del límite mensual (>=40h) o la proyección de
+ *     cierre lo superaría.
  * 🟢 Verde: operación normal.
  */
 export function evaluateStatus(
-  weeklyOvertime: number,
-  monthlyOvertime: number
+  monthlyOvertime: number,
+  projectedMonthlyOvertime: number | null = null,
+  weeklyOvertime = 0
 ): StatusEvaluation {
   const reasons: string[] = [];
 
-  const weeklyExceeded = weeklyOvertime > RULES.WEEKLY_OVERTIME_LIMIT;
   const monthlyExceeded = monthlyOvertime > RULES.MONTHLY_OVERTIME_LIMIT;
-  const weeklyWarning = weeklyOvertime >= RULES.WEEKLY_OVERTIME_WARNING;
   const monthlyWarning = monthlyOvertime >= RULES.MONTHLY_OVERTIME_WARNING;
+  const willExceedMonthly =
+    projectedMonthlyOvertime != null &&
+    projectedMonthlyOvertime > RULES.MONTHLY_OVERTIME_LIMIT;
+  const weeklyHigh = weeklyOvertime > RULES.WEEKLY_OVERTIME_LIMIT;
 
   let level: SemaphoreLevel = "green";
 
-  if (weeklyExceeded || monthlyExceeded) {
+  if (monthlyExceeded) {
     level = "red";
-    if (weeklyExceeded) {
-      reasons.push(
-        `Superó el límite semanal: ${round2(weeklyOvertime)}h > ${
-          RULES.WEEKLY_OVERTIME_LIMIT
-        }h.`
-      );
-    }
-    if (monthlyExceeded) {
-      reasons.push(
-        `Superó el límite legal mensual: ${round2(monthlyOvertime)}h > ${
-          RULES.MONTHLY_OVERTIME_LIMIT
-        }h.`
-      );
-    }
-  } else if (weeklyWarning || monthlyWarning) {
+    reasons.push(
+      `Superó el límite legal mensual: ${round2(monthlyOvertime)}h > ${
+        RULES.MONTHLY_OVERTIME_LIMIT
+      }h.`
+    );
+  } else if (monthlyWarning || willExceedMonthly) {
     level = "yellow";
-    if (weeklyWarning) {
-      reasons.push(
-        `Cerca del límite semanal: ${round2(weeklyOvertime)}h (umbral ${
-          RULES.WEEKLY_OVERTIME_WARNING
-        }h).`
-      );
-    }
     if (monthlyWarning) {
       reasons.push(
         `Cerca del límite mensual: ${round2(monthlyOvertime)}h (umbral ${
@@ -159,20 +176,31 @@ export function evaluateStatus(
         }h).`
       );
     }
+    if (willExceedMonthly) {
+      reasons.push(
+        `Proyección de cierre: ${round2(
+          projectedMonthlyOvertime as number
+        )}h — superaría las ${RULES.MONTHLY_OVERTIME_LIMIT}h.`
+      );
+    }
   } else {
     reasons.push("Operación normal.");
   }
 
-  // La alerta semanal se dispara al superar 12h extras en una misma semana.
-  const weeklyAlert = weeklyExceeded;
+  if (weeklyHigh) {
+    reasons.push(
+      `Semana alta: ${round2(weeklyOvertime)}h extra (permitido; el límite es mensual).`
+    );
+  }
 
   return {
     level,
     reasons,
     weeklyOvertime: round2(weeklyOvertime),
     monthlyOvertime: round2(monthlyOvertime),
-    weeklyAlert,
+    weeklyHigh,
     monthlyExceeded,
+    willExceedMonthly,
   };
 }
 

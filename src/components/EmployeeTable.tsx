@@ -36,7 +36,8 @@ export function EmployeeTable({
             <th className="px-4 py-3 font-medium">Jefe</th>
             <th className="px-4 py-3 text-right font-medium">Extra semanal</th>
             <th className="px-4 py-3 text-right font-medium">Extra mensual</th>
-            <th className="px-4 py-3 font-medium">Proyección</th>
+            <th className="px-4 py-3 text-right font-medium">Disp. mes</th>
+            <th className="px-4 py-3 font-medium">Proyección mes</th>
             <th className="px-4 py-3 font-medium">Estado</th>
           </tr>
         </thead>
@@ -67,17 +68,15 @@ export function EmployeeTable({
               <td className="px-4 py-3 text-slate-600">{r.area ?? "—"}</td>
               <td className="px-4 py-3 text-slate-600">{r.managerName ?? "—"}</td>
               <td className="px-4 py-3 text-right tabular-nums">
-                <span
-                  className={
-                    r.weeklyOvertime > RULES.WEEKLY_OVERTIME_LIMIT
-                      ? "font-semibold text-status-red"
-                      : r.weeklyOvertime >= RULES.WEEKLY_OVERTIME_WARNING
-                        ? "font-semibold text-status-yellow"
-                        : "text-slate-700"
-                  }
-                >
-                  {r.weeklyOvertime.toFixed(1)}h
-                </span>
+                <span className="text-slate-700">{r.weeklyOvertime.toFixed(1)}h</span>
+                {r.weeklyHigh && (
+                  <span
+                    className="ml-1 rounded bg-slate-100 px-1 text-[10px] text-slate-500"
+                    title="Semana por encima de 12h (permitido; el límite es mensual)"
+                  >
+                    alto
+                  </span>
+                )}
               </td>
               <td className="px-4 py-3 text-right tabular-nums">
                 <span
@@ -92,15 +91,14 @@ export function EmployeeTable({
                   {r.monthlyOvertime.toFixed(1)}h
                 </span>
               </td>
-              <td className="px-4 py-3 text-xs text-slate-500">
-                {r.projectedWeeklyOvertime != null ? (
-                  <span className={r.willExceedWeekly ? "text-status-red" : "text-slate-500"}>
-                    ≈ {r.projectedWeeklyOvertime.toFixed(1)}h al cierre
-                    {r.willExceedWeekly ? " (excede)" : ""}
-                  </span>
-                ) : (
-                  "—"
-                )}
+              <td className="px-4 py-3 text-right tabular-nums text-slate-600">
+                {r.availableMonthly.toFixed(1)}h
+              </td>
+              <td className="px-4 py-3 text-xs">
+                <span className={r.willExceedMonthly ? "font-medium text-status-red" : "text-slate-500"}>
+                  ≈ {r.projectedMonthlyOvertime.toFixed(1)}h/mes
+                  {r.willExceedMonthly ? " (excede 48h)" : ""}
+                </span>
               </td>
               <td className="px-4 py-3">
                 <StatusBadge level={r.level} />

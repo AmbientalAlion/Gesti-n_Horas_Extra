@@ -3,6 +3,8 @@ import { EmployeeTable } from "./EmployeeTable";
 import { DonutChart } from "./charts/DonutChart";
 import { TrendChart } from "./charts/TrendChart";
 import { HBarChart } from "./charts/HBarChart";
+import { Heatmap } from "./charts/Heatmap";
+import { StatusBadge } from "./StatusBadge";
 import { FigureCluster } from "./brand/Figures";
 import { RULES } from "@/lib/overtime";
 import type { DashboardCharts, EmployeeStatus, Period, PlantSummary } from "@/lib/aggregate";
@@ -33,6 +35,17 @@ export function DashboardView({
     .filter((s) => s.level === "red")
     .sort((a, b) => b.monthlyOvertime - a.monthlyOvertime);
 
+  // Proyección de cierre de mes: quién superará las 48h (aún no en rojo).
+  const atRisk = statuses
+    .filter((s) => s.level !== "red" && s.willExceedMonthly)
+    .sort((a, b) => b.projectedMonthlyOvertime - a.projectedMonthlyOvertime);
+
+  // Rotación equitativa: más horas disponibles = mejores candidatos a turnos.
+  const rotation = statuses
+    .filter((s) => !s.hasError && s.level !== "red")
+    .sort((a, b) => b.availableMonthly - a.availableMonthly)
+    .slice(0, 6);
+
   const avgConsumption =
     summary.totalEmployees > 0
       ? (summary.totalMonthlyOvertime /
@@ -59,16 +72,26 @@ export function DashboardView({
       {/* KPIs */}
       <section className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard label="Empleados" value={summary.totalEmployees} />
-        <StatCard label="🔴 En crítico" value={summary.red} tone="red" />
-        <StatCard label="🟡 Preventivo" value={summary.yellow} tone="yellow" />
         <StatCard
-          label="Alertas semanales"
-          value={summary.weeklyAlerts}
-          tone={summary.weeklyAlerts > 0 ? "red" : "default"}
+          label="🔴 Excede el mes"
+          value={summary.red}
+          tone="red"
+          hint="> 48h extra"
+        />
+        <StatCard
+          label="En riesgo (proyección)"
+          value={summary.atRiskMonthly}
+          tone={summary.atRiskMonthly > 0 ? "yellow" : "default"}
+          hint="superaría 48h"
         />
         <StatCard
           label="Horas extra (mes)"
           value={`${summary.totalMonthlyOvertime.toFixed(0)}h`}
+        />
+        <StatCard
+          label="Semanas altas"
+          value={summary.weeklyHigh}
+          hint="> 12h (permitido)"
         />
         <StatCard
           label="Registros con error"
@@ -136,6 +159,102 @@ export function DashboardView({
             }))}
           />
         </div>
+      </section>
+
+      {/* Heatmap área × semana */}
+      <section className="card">
+        <h2 className="mb-4 text-sm font-semibold text-brand-dark">
+          Mapa de calor · horas extra por área y semana
+        </h2>
+        <Heatmap data={charts.heatmap} />
+      </section>
+
+      {/* Proyección de cierre + reincidentes */}
+      <section className="grid gap-4 lg:grid-cols-2">
+        <div className="card">
+          <h2 className="mb-3 text-sm font-semibold text-brand-dark">
+            Proyección de cierre de mes · en riesgo de superar 48h
+          </h2>
+          {atRisk.length === 0 ? (
+            <p className="py-4 text-center text-sm text-slate-400">
+              Nadie proyecta superar el límite mensual. 👍
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100 text-sm">
+              {atRisk.map((s) => (
+                <li key={s.id} className="flex items-center gap-2 py-2">
+                  <a
+                    href={empLink(s.id)}
+                    className="font-medium text-brand hover:underline"
+                  >
+                    {s.name ?? s.code}
+                  </a>
+                  <span className="text-xs text-slate-400">{s.area}</span>
+                  <span className="ml-auto tabular-nums text-slate-600">
+                    {s.monthlyOvertime.toFixed(0)}h →{" "}
+                    <span className="font-semibold text-status-yellow">
+                      ≈{s.projectedMonthlyOvertime.toFixed(0)}h
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="card">
+          <h2 className="mb-3 text-sm font-semibold text-brand-dark">
+            Reincidentes · 2+ semanas por encima de 12h
+          </h2>
+          {charts.reincidentes.length === 0 ? (
+            <p className="py-4 text-center text-sm text-slate-400">
+              Sin reincidentes este mes.
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100 text-sm">
+              {charts.reincidentes.map((r) => (
+                <li key={r.id} className="flex items-center gap-2 py-2">
+                  <a
+                    href={empLink(r.id)}
+                    className="font-medium text-brand hover:underline"
+                  >
+                    {r.name}
+                  </a>
+                  <span className="text-xs text-slate-400">{r.area}</span>
+                  <StatusBadge level={r.level} />
+                  <span className="ml-auto text-xs font-medium text-slate-600">
+                    {r.weeksHigh} semanas altas
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      {/* Rotación equitativa */}
+      <section className="card">
+        <h2 className="mb-1 text-sm font-semibold text-brand-dark">
+          Rotación equitativa · candidatos con más horas disponibles
+        </h2>
+        <p className="mb-3 text-xs text-slate-400">
+          Sugerencia para repartir turnos sin acercar a nadie al límite mensual.
+        </p>
+        {rotation.length === 0 ? (
+          <p className="py-4 text-center text-sm text-slate-400">Sin candidatos.</p>
+        ) : (
+          <HBarChart
+            unit="h"
+            color="#00CBBF"
+            items={rotation.map((s) => ({
+              label: s.name ?? s.code,
+              value: s.availableMonthly,
+              level: s.level,
+              sublabel: `${s.area ?? "—"} · disponible`,
+              href: empLink(s.id),
+            }))}
+          />
+        )}
       </section>
 
       {critical.length > 0 && (

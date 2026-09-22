@@ -67,23 +67,11 @@ export function EmployeeDetailView({
         )}
       </header>
 
-      {/* Horas disponibles (lo que pidió el usuario) */}
+      {/* Horas disponibles — el límite DURO es el mensual */}
       <section className="grid gap-4 md:grid-cols-2">
-        <div className="card">
-          <p className="text-sm font-medium text-slate-600">
-            Horas extra disponibles esta semana
-          </p>
-          <div className="mt-3">
-            <BudgetBar
-              used={d.weeklyOvertime}
-              limit={RULES.WEEKLY_OVERTIME_LIMIT}
-              warning={RULES.WEEKLY_OVERTIME_WARNING}
-            />
-          </div>
-        </div>
-        <div className="card">
-          <p className="text-sm font-medium text-slate-600">
-            Horas extra disponibles este mes (límite legal)
+        <div className="card border-brand/30">
+          <p className="text-sm font-medium text-brand-dark">
+            Horas extra disponibles este mes (límite legal 48h)
           </p>
           <div className="mt-3">
             <BudgetBar
@@ -92,6 +80,24 @@ export function EmployeeDetailView({
               warning={RULES.MONTHLY_OVERTIME_WARNING}
             />
           </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Este es el límite que no puede superarse.
+          </p>
+        </div>
+        <div className="card">
+          <p className="text-sm font-medium text-slate-600">
+            Horas extra de la semana (referencia)
+          </p>
+          <div className="mt-3">
+            <BudgetBar
+              used={d.weeklyOvertime}
+              limit={RULES.WEEKLY_OVERTIME_LIMIT}
+              warning={RULES.WEEKLY_OVERTIME_WARNING}
+            />
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Superar 12h en una semana está permitido; es solo informativo.
+          </p>
         </div>
       </section>
 
@@ -116,22 +122,20 @@ export function EmployeeDetailView({
           </p>
           <p className="text-xs text-slate-400">{trend.label}</p>
         </div>
-        {d.projectedWeeklyOvertime != null && (
-          <div className="card">
-            <p className="text-sm text-slate-500">Proyección al cierre (burn rate)</p>
-            <p
-              className={clsx(
-                "mt-1 text-lg font-semibold",
-                d.willExceedWeekly ? "text-status-red" : "text-brand-dark"
-              )}
-            >
-              ≈ {d.projectedWeeklyOvertime.toFixed(1)}h
-            </p>
-            <p className="text-xs text-slate-400">
-              {d.willExceedWeekly ? "Superaría el límite semanal" : "Dentro del límite"}
-            </p>
-          </div>
-        )}
+        <div className="card">
+          <p className="text-sm text-slate-500">Proyección de cierre de mes</p>
+          <p
+            className={clsx(
+              "mt-1 text-lg font-semibold",
+              d.willExceedMonthly ? "text-status-red" : "text-brand-dark"
+            )}
+          >
+            ≈ {d.projectedMonthlyOvertime.toFixed(1)}h
+          </p>
+          <p className="text-xs text-slate-400">
+            {d.willExceedMonthly ? "Superaría las 48h del mes" : "Dentro del límite mensual"}
+          </p>
+        </div>
         {d.areaRankPosition && d.areaRankTotal && (
           <div className="card">
             <p className="text-sm text-slate-500">Ranking en su área</p>
@@ -146,12 +150,18 @@ export function EmployeeDetailView({
           <p
             className={clsx(
               "mt-1 text-lg font-semibold",
-              d.monthlyExceeded || d.weeklyAlert
+              d.monthlyExceeded
                 ? "text-status-red"
-                : "text-status-green"
+                : d.willExceedMonthly
+                  ? "text-status-yellow"
+                  : "text-status-green"
             )}
           >
-            {d.monthlyExceeded || d.weeklyAlert ? "En riesgo" : "En regla"}
+            {d.monthlyExceeded
+              ? "Excedido"
+              : d.willExceedMonthly
+                ? "En riesgo"
+                : "En regla"}
           </p>
           <p className="text-xs text-slate-400">
             {d.frozenCount > 0 ? `${d.frozenCount} registro(s) por revisar` : "Sin novedades"}

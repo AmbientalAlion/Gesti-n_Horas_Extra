@@ -60,6 +60,16 @@ export interface StatusEvaluation {
   reasons: string[];
   weeklyOvertime: number;
   monthlyOvertime: number;
-  weeklyAlert: boolean;
+  /** Informativo: superó 12h extra en la semana (PERMITIDO; el límite es mensual). */
+  weeklyHigh: boolean;
+  /** Crítico: superó el límite legal mensual de 48h (NO permitido). */
   monthlyExceeded: boolean;
+  /** La proyección de cierre de mes superaría las 48h. */
+  willExceedMonthly: boolean;
+}
+
+export interface MonthProjection {
+  weeksElapsed: number;
+  projectedMonthlyOvertime: number;
+  willExceedMonthly: boolean;
 }
