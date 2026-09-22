@@ -1,7 +1,14 @@
 import clsx from "clsx";
 
-// Bloque de marca ALIÓN con área de reserva y marcas de respaldo Molins + Corona.
-// El logotipo oficial no se recrea: se deja el espacio reservado indicado.
+// Logotipo oficial de ALIÓN (Molins + Corona). Usa la versión original sobre
+// fondo claro y la versión blanca sobre azul en modo oscuro. No se recrea ni
+// altera el logo; se respeta un área de reserva alrededor.
+
+const HEIGHTS: Record<"sm" | "md" | "lg", string> = {
+  sm: "h-8",
+  md: "h-12",
+  lg: "h-16",
+};
 
 export function BrandMark({
   size = "md",
@@ -10,21 +17,21 @@ export function BrandMark({
   size?: "sm" | "md" | "lg";
   className?: string;
 }) {
-  const nameSize =
-    size === "lg" ? "text-4xl" : size === "sm" ? "text-lg" : "text-2xl";
-
+  const h = HEIGHTS[size];
   return (
     <div className={clsx("select-none", className)}>
-      {/* Área de reserva: el logotipo oficial de ALIÓN va en este espacio. */}
-      <div
-        className={clsx("font-bold tracking-tight text-brand", nameSize)}
-        title="Espacio reservado para el logotipo oficial de ALIÓN"
-      >
-        ALIÓN
-      </div>
-      <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-brand-dark/70">
-        Una marca: Molins + Corona
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/brand/logo-alion.png"
+        alt="ALIÓN — Molins + Corona"
+        className={clsx(h, "w-auto object-contain dark:hidden")}
+      />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/brand/logo-alion-dark.png"
+        alt="ALIÓN — Molins + Corona"
+        className={clsx(h, "hidden w-auto rounded object-contain dark:block")}
+      />
     </div>
   );
 }
