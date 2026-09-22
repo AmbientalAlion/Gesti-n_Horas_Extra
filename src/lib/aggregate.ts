@@ -109,6 +109,14 @@ export interface EmployeeDetail {
 
   areaRankPosition?: number;
   areaRankTotal?: number;
+
+  /** Desglose de recargos del mes (formato real). */
+  recargos?: {
+    diurna: number;
+    nocturna: number;
+    dom_diurna: number;
+    dom_nocturna: number;
+  };
 }
 
 /**

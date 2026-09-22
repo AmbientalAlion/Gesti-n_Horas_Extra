@@ -81,7 +81,9 @@ export async function getDashboardData(period?: Period): Promise<DashboardData> 
 
   const { data: employeesRaw } = await supabase
     .from("employees")
-    .select("id, code, name, role_title, area, manager_id, profiles:manager_id (full_name)")
+    .select(
+      "id, code, name, role_title, area, manager_id, manager_name, profiles:manager_id (full_name)"
+    )
     .eq("active", true);
 
   const employees: EmployeeInput[] = (employeesRaw ?? []).map((e: any) => ({
@@ -91,7 +93,7 @@ export async function getDashboardData(period?: Period): Promise<DashboardData> 
     area: e.area ?? undefined,
     roleTitle: e.role_title ?? undefined,
     managerId: e.manager_id ?? undefined,
-    managerName: e.profiles?.full_name ?? undefined,
+    managerName: e.manager_name ?? e.profiles?.full_name ?? undefined,
   }));
 
   const { data: recordsRaw } = await supabase
@@ -153,12 +155,13 @@ export async function getEmployeeDetail(
   const { data: recordsRaw } = await supabase
     .from("weekly_records")
     .select(
-      "employee_id, year, week, month, total_hours, overtime_hours, is_partial, has_error, error_reason, max_shift_hours"
+      "employee_id, year, week, month, total_hours, overtime_hours, is_partial, has_error, error_reason, max_shift_hours, ot_extra_diurna, ot_extra_nocturna, ot_dom_diurna, ot_dom_nocturna"
     )
     .eq("employee_id", id)
     .eq("year", period.year);
 
-  const history: WeeklyRecord[] = (recordsRaw ?? []).map((r: any) => ({
+  const raw = recordsRaw ?? [];
+  const history: WeeklyRecord[] = raw.map((r: any) => ({
     employeeId: r.employee_id,
     year: r.year,
     week: r.week,
@@ -171,7 +174,25 @@ export async function getEmployeeDetail(
     maxShiftHours: r.max_shift_hours != null ? Number(r.max_shift_hours) : undefined,
   }));
 
-  return buildEmployeeDetail(status, history, dash.statuses, dash.period);
+  const detail = buildEmployeeDetail(status, history, dash.statuses, dash.period);
+
+  // Desglose de recargos del mes (formato real).
+  const monthRaw = raw.filter((r: any) => r.month === period.month);
+  const rec = {
+    diurna: sum(monthRaw, "ot_extra_diurna"),
+    nocturna: sum(monthRaw, "ot_extra_nocturna"),
+    dom_diurna: sum(monthRaw, "ot_dom_diurna"),
+    dom_nocturna: sum(monthRaw, "ot_dom_nocturna"),
+  };
+  if (rec.diurna + rec.nocturna + rec.dom_diurna + rec.dom_nocturna > 0) {
+    detail.recargos = rec;
+  }
+
+  return detail;
+}
+
+function sum(rows: any[], key: string): number {
+  return Math.round(rows.reduce((a, r) => a + Number(r[key] ?? 0), 0) * 100) / 100;
 }
 
 /** Periodo actual (año, mes, semana ISO) según la fecha del servidor. */

@@ -173,6 +173,25 @@ export function EmployeeDetailView({
         </div>
       </section>
 
+      {/* Desglose de recargos del mes (formato real) */}
+      {d.recargos && (
+        <section>
+          <h2 className="mb-3 text-lg font-semibold text-brand-dark">
+            Recargos del mes
+          </h2>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <Metric label="Extra diurna" value={`${d.recargos.diurna.toFixed(1)}h`} />
+            <Metric label="Extra nocturna" value={`${d.recargos.nocturna.toFixed(1)}h`} />
+            <Metric label="Dominical diurna" value={`${d.recargos.dom_diurna.toFixed(1)}h`} />
+            <Metric label="Dominical nocturna" value={`${d.recargos.dom_nocturna.toFixed(1)}h`} />
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Clasificación según el archivo de novedades. Base para el cálculo de
+            recargos de ley (25% / 75% / dominical).
+          </p>
+        </section>
+      )}
+
       {/* Cuándo hizo esas horas: historial semanal */}
       <section>
         <h2 className="mb-3 text-lg font-semibold text-brand-dark">
