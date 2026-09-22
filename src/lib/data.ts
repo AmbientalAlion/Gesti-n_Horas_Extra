@@ -1,0 +1,131 @@
+// Capa de acceso a datos para los dashboards (Server Components).
+// Usa Supabase cuando está configurado; de lo contrario, datos demo.
+
+import {
+  computeEmployeeStatuses,
+  summarize,
+  type EmployeeInput,
+  type EmployeeStatus,
+  type Period,
+  type PlantSummary,
+} from "./aggregate";
+import { DEMO_PERIOD, demoEmployees, demoRecords, isSupabaseConfigured } from "./demo";
+import { createClient } from "./supabase/server";
+import type { Role, WeeklyRecord } from "./types";
+
+export interface DashboardData {
+  statuses: EmployeeStatus[];
+  summary: PlantSummary;
+  period: Period;
+  demo: boolean;
+  role: Role | "demo";
+}
+
+export interface SessionProfile {
+  id: string;
+  email: string;
+  fullName: string | null;
+  role: Role;
+}
+
+/** Devuelve el perfil del usuario autenticado, o null si no hay sesión. */
+export async function getSessionProfile(): Promise<SessionProfile | null> {
+  if (!isSupabaseConfigured()) return null;
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, email, full_name, role")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile) return null;
+  return {
+    id: profile.id,
+    email: profile.email,
+    fullName: profile.full_name,
+    role: profile.role as Role,
+  };
+}
+
+/**
+ * Obtiene los datos del dashboard para el periodo indicado (por defecto el actual).
+ * El alcance se aplica por RLS en Supabase (un jefe solo ve su equipo).
+ */
+export async function getDashboardData(period?: Period): Promise<DashboardData> {
+  const p = period ?? currentPeriod();
+
+  if (!isSupabaseConfigured()) {
+    const statuses = computeEmployeeStatuses(demoEmployees, demoRecords, DEMO_PERIOD);
+    return {
+      statuses,
+      summary: summarize(statuses),
+      period: DEMO_PERIOD,
+      demo: true,
+      role: "demo",
+    };
+  }
+
+  const supabase = createClient();
+  const profile = await getSessionProfile();
+
+  const { data: employeesRaw } = await supabase
+    .from("employees")
+    .select("id, code, name, role_title, area, manager_id, profiles:manager_id (full_name)")
+    .eq("active", true);
+
+  const employees: EmployeeInput[] = (employeesRaw ?? []).map((e: any) => ({
+    id: e.id,
+    code: e.code,
+    name: e.name ?? undefined,
+    area: e.area ?? undefined,
+    roleTitle: e.role_title ?? undefined,
+    managerId: e.manager_id ?? undefined,
+    managerName: e.profiles?.full_name ?? undefined,
+  }));
+
+  const { data: recordsRaw } = await supabase
+    .from("weekly_records")
+    .select(
+      "employee_id, year, week, month, total_hours, overtime_hours, is_partial, has_error, error_reason, max_shift_hours"
+    )
+    .eq("year", p.year)
+    .eq("month", p.month);
+
+  const records: WeeklyRecord[] = (recordsRaw ?? []).map((r: any) => ({
+    employeeId: r.employee_id,
+    year: r.year,
+    week: r.week,
+    month: r.month,
+    totalHours: Number(r.total_hours),
+    overtimeHours: Number(r.overtime_hours),
+    isPartial: r.is_partial,
+    hasError: r.has_error,
+    errorReason: r.error_reason ?? undefined,
+    maxShiftHours: r.max_shift_hours != null ? Number(r.max_shift_hours) : undefined,
+  }));
+
+  const statuses = computeEmployeeStatuses(employees, records, p);
+  return {
+    statuses,
+    summary: summarize(statuses),
+    period: p,
+    demo: false,
+    role: profile?.role ?? "jefe",
+  };
+}
+
+/** Periodo actual (año, mes, semana ISO) según la fecha del servidor. */
+export function currentPeriod(): Period {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return { year: now.getFullYear(), month: now.getMonth() + 1, week };
+}
