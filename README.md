@@ -10,6 +10,20 @@ legales y optimizando el presupuesto.
 - **Backend / BD:** Supabase (Postgres + Auth + RLS)
 - **Despliegue:** Vercel
 
+## Despliegue en producción
+
+La aplicación está desplegada en Vercel y conectada a Supabase:
+
+- **App:** https://gestion-horas-extra-ambiental1.vercel.app
+- **Backend:** proyecto Supabase `gestion-horas-extra` (org AmbientalAlion).
+
+El backend ya tiene el esquema, las políticas RLS y datos de ejemplo, además
+de usuarios iniciales para cada rol (RRHH, Director, Jefe). Las credenciales de
+esos usuarios se entregan por canal privado; **cámbielas en el primer inicio de
+sesión** desde Supabase → Authentication.
+
+Cada `git push` a la rama conectada dispara un nuevo despliegue automático.
+
 ## Arranque rápido
 
 ```bash
