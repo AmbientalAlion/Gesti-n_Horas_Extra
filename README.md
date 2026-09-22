@@ -24,6 +24,15 @@ sesión** desde Supabase → Authentication.
 
 Cada `git push` a la rama conectada dispara un nuevo despliegue automático.
 
+### Demo público (sin login)
+
+Para recorrer **todas las funciones** sin credenciales:
+https://gestion-horas-extra-ambiental1.vercel.app/demo/dashboard
+
+Incluye un selector **«Ver como»** (RRHH / Director / Jefe) que demuestra el
+alcance por rol, el módulo de carga con validación de CSV (sin persistir) y la
+exportación del CSV depurado. Usa datos de ejemplo.
+
 ## Arranque rápido
 
 ```bash
