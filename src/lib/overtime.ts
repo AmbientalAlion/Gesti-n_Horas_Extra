@@ -35,6 +35,8 @@ export const RULES = {
   WORKING_DAYS_PER_WEEK: 6,
   /** Semanas promedio por mes, para proyectar el cierre mensual. */
   WEEKS_PER_MONTH: 4.345,
+  /** Máximo de horas extra por solicitud de autorización. */
+  MAX_AUTHORIZATION_HOURS: 5,
 } as const;
 
 /**

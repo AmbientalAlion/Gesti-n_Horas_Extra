@@ -1,9 +1,18 @@
 import { redirect } from "next/navigation";
-import { getSessionProfile, currentPeriod } from "@/lib/data";
+import { getSessionProfile, getDashboardData, currentPeriod } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import { solicitarAutorizacion, decidirAutorizacion } from "./actions";
+import { decidirAutorizacion } from "./actions";
+import { AuthRequestForm, type AuthEmployee } from "@/components/AuthRequestForm";
+import type { WeekDay } from "@/components/WeekCalendar";
+import { RULES } from "@/lib/overtime";
 
 export const dynamic = "force-dynamic";
+
+const MONTHS = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+];
+const DOW = ["L", "M", "M", "J", "V", "S", "D"];
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   solicitada: { label: "Solicitada", cls: "text-status-yellow" },
@@ -11,27 +20,52 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   rechazada: { label: "Rechazada", cls: "text-status-red" },
 };
 
+function currentWeekDays(): WeekDay[] {
+  const now = new Date();
+  const dow = now.getDay() || 7;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (dow - 1));
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return {
+      dow: DOW[i],
+      day: d.getDate(),
+      isToday: d.toDateString() === now.toDateString(),
+    };
+  });
+}
+
 export default async function AutorizacionesPage() {
   const profile = await getSessionProfile();
   if (!profile) redirect("/login");
 
+  const period = currentPeriod();
   const supabase = createClient();
-  const cur = currentPeriod();
 
-  const [{ data: auths }, { data: employees }] = await Promise.all([
+  const [{ statuses }, { data: authsRaw }] = await Promise.all([
+    getDashboardData(period),
     supabase
       .from("overtime_authorizations")
       .select(
-        "id, year, week, hours, reason, status, requested_at, decided_at, decision_note, employees(code, name, area)"
+        "id, year, week, hours, reason, status, requested_at, decided_at, decision_note, employee_id, employees(code, name, area)"
       )
       .order("requested_at", { ascending: false }),
-    supabase.from("employees").select("id, code, name, area").eq("active", true).order("code"),
   ]);
 
-  const rows = (auths ?? []) as any[];
+  const monthlyByEmp = new Map(statuses.map((s) => [s.id, s.monthlyOvertime]));
+  const employees: AuthEmployee[] = statuses
+    .map((s) => ({
+      id: s.id,
+      name: s.name ?? s.code,
+      area: s.area ?? "—",
+      monthlyOvertime: s.monthlyOvertime,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const auths = (authsRaw ?? []) as any[];
   const canRequest = profile.role === "jefe" || profile.role === "rrhh";
-  const canDecide = profile.role === "rrhh";
-  const emps = employees ?? [];
+  const canDecide = profile.role === "rrhh" || profile.role === "director";
 
   return (
     <div className="space-y-6">
@@ -40,67 +74,42 @@ export default async function AutorizacionesPage() {
           Autorización previa de horas extra
         </h1>
         <p className="text-sm text-slate-500">
-          El jefe solicita las horas extra; RRHH las aprueba o rechaza. Queda
-          trazabilidad de quién solicitó y quién decidió.
+          El jefe solicita (máximo {RULES.MAX_AUTHORIZATION_HOURS}h, semana en
+          curso); el Director de planta o RRHH aprueban o rechazan.
         </p>
       </header>
 
       {canRequest && (
         <section className="card">
           <h2 className="mb-3 text-sm font-semibold text-brand-dark">Nueva solicitud</h2>
-          <form action={solicitarAutorizacion} className="grid gap-3 md:grid-cols-5">
-            <select
-              name="employeeId"
-              required
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2"
-            >
-              <option value="">Empleado…</option>
-              {emps.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.name ?? e.code} — {e.area ?? "—"}
-                </option>
-              ))}
-            </select>
-            <input
-              name="week"
-              type="number"
-              min={1}
-              max={53}
-              defaultValue={cur.week}
-              placeholder="Semana"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              required
-            />
-            <input type="hidden" name="year" value={cur.year} />
-            <input
-              name="hours"
-              type="number"
-              step="0.5"
-              min="0.5"
-              placeholder="Horas"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              required
-            />
-            <button className="btn-primary text-sm">Solicitar</button>
-            <input
-              name="reason"
-              placeholder="Motivo (opcional)"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-5"
-            />
-          </form>
+          <AuthRequestForm
+            employees={employees}
+            days={currentWeekDays()}
+            weekNumber={period.week}
+            monthLabel={MONTHS[period.month - 1]}
+            year={period.year}
+          />
         </section>
       )}
 
       <section>
         <h2 className="mb-3 text-lg font-semibold text-brand-dark">Solicitudes</h2>
-        {rows.length === 0 ? (
+        {auths.length === 0 ? (
           <div className="card text-center text-sm text-slate-500">
             No hay solicitudes registradas.
           </div>
         ) : (
           <div className="space-y-3">
-            {rows.map((r) => {
+            {auths.map((r) => {
               const st = STATUS_LABEL[r.status] ?? STATUS_LABEL.solicitada;
+              const monthly = monthlyByEmp.get(r.employee_id) ?? 0;
+              const projected = monthly + Number(r.hours);
+              const flag =
+                projected > RULES.MONTHLY_OVERTIME_LIMIT
+                  ? { cls: "text-status-red", text: `⛔ superaría 48h (≈${projected.toFixed(0)}h)` }
+                  : projected >= RULES.MONTHLY_OVERTIME_WARNING
+                    ? { cls: "text-status-yellow", text: `⚠ cerca del límite (≈${projected.toFixed(0)}h)` }
+                    : null;
               return (
                 <div key={r.id} className="card">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -112,6 +121,9 @@ export default async function AutorizacionesPage() {
                         Semana {r.week} · {r.year} · {Number(r.hours).toFixed(1)}h extra
                         {r.reason ? ` · ${r.reason}` : ""}
                       </div>
+                      {flag && (
+                        <div className={`mt-1 text-xs font-medium ${flag.cls}`}>{flag.text}</div>
+                      )}
                       {r.decided_at && (
                         <div className="mt-1 text-xs text-slate-400">
                           Decisión registrada{r.decision_note ? `: ${r.decision_note}` : ""}
@@ -122,26 +134,18 @@ export default async function AutorizacionesPage() {
                   </div>
 
                   {canDecide && r.status === "solicitada" && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <form action={decidirAutorizacion} className="flex items-center gap-2">
+                    <div className="mt-3">
+                      <form action={decidirAutorizacion} className="flex flex-wrap items-center gap-2">
                         <input type="hidden" name="id" value={r.id} />
                         <input
                           name="note"
                           placeholder="Nota de decisión"
                           className="rounded border border-slate-300 px-2 py-1 text-sm"
                         />
-                        <button
-                          name="decision"
-                          value="aprobada"
-                          className="btn-primary text-sm"
-                        >
+                        <button name="decision" value="aprobada" className="btn-primary text-sm">
                           Aprobar
                         </button>
-                        <button
-                          name="decision"
-                          value="rechazada"
-                          className="btn-secondary text-sm"
-                        >
+                        <button name="decision" value="rechazada" className="btn-secondary text-sm">
                           Rechazar
                         </button>
                       </form>
