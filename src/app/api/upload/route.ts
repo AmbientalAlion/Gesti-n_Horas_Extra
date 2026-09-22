@@ -32,6 +32,7 @@ export async function POST(request: Request) {
   const month = Number(form.get("month"));
   const cutType = String(form.get("cutType") ?? "final");
   const isPartial = cutType === "parcial";
+  const demoOnly = String(form.get("demo") ?? "") === "true";
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "No se recibió el archivo CSV." }, { status: 400 });
@@ -71,9 +72,9 @@ export async function POST(request: Request) {
     preview,
   };
 
-  // En modo demo solo devolvemos la validación (sin persistir).
-  if (!isSupabaseConfigured()) {
-    return NextResponse.json(result);
+  // Modo demo o sin Supabase: solo validación, sin persistir.
+  if (demoOnly || !isSupabaseConfigured()) {
+    return NextResponse.json({ ...result, demo: true });
   }
 
   // Solo RRHH puede persistir.

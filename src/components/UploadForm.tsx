@@ -33,7 +33,7 @@ function defaultPeriod() {
   return { year: now.getFullYear(), month: now.getMonth() + 1, week };
 }
 
-export function UploadForm() {
+export function UploadForm({ demo = false }: { demo?: boolean }) {
   const p = defaultPeriod();
   const [file, setFile] = useState<File | null>(null);
   const [year, setYear] = useState(p.year);
@@ -68,6 +68,7 @@ export function UploadForm() {
       fd.append("week", String(week));
       fd.append("month", String(month));
       fd.append("cutType", cutType);
+      if (demo) fd.append("demo", "true");
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       const data: UploadResponse = await res.json();
       if (!res.ok) {

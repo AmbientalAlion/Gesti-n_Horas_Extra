@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import type { Role } from "@/lib/types";
 import { signOut } from "@/app/login/actions";
+import { BrandMark, Claim } from "@/components/brand/BrandMark";
 
 interface NavProps {
   role: Role | "demo";
@@ -30,11 +31,9 @@ export function Nav({ role }: NavProps) {
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
       <div className="border-b border-slate-200 px-5 py-5">
-        <div className="text-xl font-bold tracking-tight text-brand">ALIÓN</div>
-        <div className="text-xs text-slate-500">Control de Horas Extras</div>
-        <div className="mt-1 text-[11px] text-brand-dark">
-          Siempre <span className="font-bold">firme</span>
-        </div>
+        <BrandMark size="md" />
+        <div className="mt-2 text-xs text-slate-500">Control de Horas Extras</div>
+        <Claim className="mt-1 block text-[11px]" />
       </div>
       <nav className="flex-1 space-y-1 p-3">
         {links.map((link) => {

@@ -44,7 +44,11 @@ export async function updateSession(request: NextRequest) {
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
   const isPublicAsset =
     request.nextUrl.pathname === "/" ||
-    request.nextUrl.pathname.startsWith("/_next");
+    request.nextUrl.pathname.startsWith("/_next") ||
+    request.nextUrl.pathname.startsWith("/demo") || // demo público
+    // Los route handlers de API aplican su propia autorización (RLS para
+    // export; verificación de rol RRHH para persistir en upload).
+    request.nextUrl.pathname.startsWith("/api");
 
   if (!user && !isAuthRoute && !isPublicAsset) {
     const url = request.nextUrl.clone();

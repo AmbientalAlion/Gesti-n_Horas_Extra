@@ -1,8 +1,15 @@
 // Datos de demostración usados cuando Supabase no está configurado.
 // Permiten ejecutar y evaluar la aplicación de inmediato.
 
-import type { EmployeeInput } from "./aggregate";
-import type { WeeklyRecord } from "./types";
+import {
+  computeEmployeeStatuses,
+  summarize,
+  type EmployeeInput,
+  type EmployeeStatus,
+  type Period,
+  type PlantSummary,
+} from "./aggregate";
+import type { Role, WeeklyRecord } from "./types";
 
 export function isSupabaseConfigured(): boolean {
   return Boolean(
@@ -53,6 +60,59 @@ export const demoRecords: WeeklyRecord[] = [
   rec("e6", 24, 6, 60), // 18
   rec("e6", 25, 6, 58), // 16  => 52 extra en el mes
 ];
+
+// El "jefe" de la demostración gestiona al equipo de Producción (manager m1).
+const DEMO_JEFE_MANAGER = "m1";
+
+export interface DemoDashboard {
+  statuses: EmployeeStatus[];
+  summary: PlantSummary;
+  period: Period;
+  roleView: Role;
+}
+
+/**
+ * Datos del dashboard de demostración para una vista de rol.
+ * - jefe: solo su equipo directo (Producción).
+ * - rrhh / director: toda la planta.
+ */
+export function demoDashboard(roleView: Role): DemoDashboard {
+  const employees =
+    roleView === "jefe"
+      ? demoEmployees.filter((e) => e.managerId === DEMO_JEFE_MANAGER)
+      : demoEmployees;
+
+  const empIds = new Set(employees.map((e) => e.id));
+  const records = demoRecords.filter((r) => empIds.has(r.employeeId));
+
+  const statuses = computeEmployeeStatuses(employees, records, DEMO_PERIOD);
+  return {
+    statuses,
+    summary: summarize(statuses),
+    period: DEMO_PERIOD,
+    roleView,
+  };
+}
+
+/** Exporta las novedades depuradas del periodo demo para una vista de rol. */
+export function demoExportRows(roleView: Role) {
+  const { statuses, period } = demoDashboard(roleView);
+  return {
+    period,
+    rows: statuses
+      .filter((s) => !s.hasError && s.monthlyOvertime > 0)
+      .map((s) => ({
+        employeeId: s.code,
+        name: s.name,
+        area: s.area,
+        year: period.year,
+        month: period.month,
+        week: period.week,
+        overtimeHours: s.monthlyOvertime,
+        status: s.level,
+      })),
+  };
+}
 
 function rec(
   employeeId: string,
