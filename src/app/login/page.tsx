@@ -10,11 +10,14 @@ export default function LoginPage({
   const configured = isSupabaseConfigured();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-brand-tint px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <div className="text-2xl font-bold text-brand">ALION</div>
+          <div className="text-3xl font-bold tracking-tight text-brand">ALIÓN</div>
           <p className="text-sm text-slate-500">Control de Horas Extras</p>
+          <p className="mt-1 text-xs text-brand-dark">
+            Siempre <span className="font-bold">firme</span>
+          </p>
         </div>
 
         {!configured ? (

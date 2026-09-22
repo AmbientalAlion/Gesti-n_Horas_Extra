@@ -1,4 +1,4 @@
-# Control de Horas Extras · ALION
+# Control de Horas Extras · ALIÓN
 
 Aplicación web para **auditar, controlar y predecir** las horas extras del
 personal de planta de ALION, garantizando el cumplimiento de los límites
