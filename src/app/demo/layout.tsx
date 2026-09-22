@@ -7,8 +7,8 @@ export default function DemoLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen">
-      <Suspense fallback={<div className="w-60 shrink-0 border-r border-slate-200 bg-white" />}>
+    <div className="flex min-h-screen flex-col lg:flex-row">
+      <Suspense fallback={<div className="w-full border-b border-slate-200 bg-white lg:w-60 lg:border-b-0 lg:border-r" />}>
         <DemoNav />
       </Suspense>
       <main className="flex-1 overflow-x-hidden">

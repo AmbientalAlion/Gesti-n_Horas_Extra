@@ -13,6 +13,71 @@ body {
   font-family: "Mulish", "Muli", Arial, sans-serif;
 }
 
+/* ---------- Modo oscuro ---------- */
+.dark {
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+}
+.dark .card {
+  background-color: #131c2e;
+  border-color: #24314a;
+}
+.dark .btn-secondary {
+  background-color: #131c2e;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+.dark .bg-white {
+  background-color: #131c2e !important;
+}
+.dark .bg-slate-50 {
+  background-color: #0f1930 !important;
+}
+.dark .bg-slate-100 {
+  background-color: #1e293b !important;
+}
+.dark .bg-brand-tint {
+  background-color: #10233a !important;
+}
+.dark .text-slate-900 {
+  color: #e2e8f0 !important;
+}
+.dark .text-slate-700 {
+  color: #cbd5e1 !important;
+}
+.dark .text-slate-600 {
+  color: #b6c2d4 !important;
+}
+.dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+.dark .text-slate-400 {
+  color: #7c8aa0 !important;
+}
+.dark .text-brand-dark {
+  color: #7fd0e3 !important;
+}
+.dark .border-slate-200 {
+  border-color: #24314a !important;
+}
+.dark .border-slate-100 {
+  border-color: #1c2740 !important;
+}
+.dark .border-slate-300 {
+  border-color: #334155 !important;
+}
+.dark .divide-slate-100 > * + *,
+.dark .divide-slate-200 > * + * {
+  border-color: #24314a !important;
+}
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #0f1930;
+  color: #e2e8f0;
+  border-color: #334155;
+}
+
 @media print {
   body {
     background: #fff;
