@@ -27,6 +27,7 @@ export function Nav({ role }: NavProps) {
     { href: "/dashboard", label: "Dashboard" },
     ...(isRrhh ? [{ href: "/upload", label: "Cargar CSV" }] : []),
     { href: "/export", label: "Exportar" },
+    { href: "/autorizaciones", label: "Autorizaciones" },
     ...(isRrhh ? [{ href: "/revisiones", label: "Revisiones" }] : []),
     ...(isRrhh ? [{ href: "/admin", label: "Usuarios" }] : []),
   ];

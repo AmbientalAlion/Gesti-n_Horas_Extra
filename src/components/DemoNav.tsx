@@ -17,6 +17,7 @@ const LINKS = [
   { href: "/demo/dashboard", label: "Dashboard" },
   { href: "/demo/upload", label: "Cargar CSV" },
   { href: "/demo/export", label: "Exportar" },
+  { href: "/demo/autorizaciones", label: "Autorizaciones" },
   { href: "/demo/revisiones", label: "Revisiones" },
   { href: "/demo/admin", label: "Usuarios" },
 ];
