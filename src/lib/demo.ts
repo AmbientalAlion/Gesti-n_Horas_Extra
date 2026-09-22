@@ -2,8 +2,10 @@
 // Permiten ejecutar y evaluar la aplicación de inmediato.
 
 import {
+  buildEmployeeDetail,
   computeEmployeeStatuses,
   summarize,
+  type EmployeeDetail,
   type EmployeeInput,
   type EmployeeStatus,
   type Period,
@@ -112,6 +114,18 @@ export function demoExportRows(roleView: Role) {
         status: s.level,
       })),
   };
+}
+
+/** Detalle de un empleado en el demo, respetando el alcance del rol. */
+export function demoEmployeeDetail(
+  id: string,
+  roleView: Role
+): EmployeeDetail | null {
+  const dash = demoDashboard(roleView);
+  const status = dash.statuses.find((s) => s.id === id);
+  if (!status) return null;
+  const history = demoRecords.filter((r) => r.employeeId === id);
+  return buildEmployeeDetail(status, history, dash.statuses, dash.period);
 }
 
 function rec(

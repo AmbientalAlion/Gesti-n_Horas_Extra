@@ -92,7 +92,7 @@ export default function DemoDashboard({
         <h2 className="mb-3 text-lg font-semibold text-brand-dark">
           Detalle por empleado
         </h2>
-        <EmployeeTable rows={statuses} />
+        <EmployeeTable rows={statuses} hrefBase="/demo/empleado" roleParam={role} />
       </section>
     </div>
   );

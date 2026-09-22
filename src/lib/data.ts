@@ -2,8 +2,10 @@
 // Usa Supabase cuando está configurado; de lo contrario, datos demo.
 
 import {
+  buildEmployeeDetail,
   computeEmployeeStatuses,
   summarize,
+  type EmployeeDetail,
   type EmployeeInput,
   type EmployeeStatus,
   type Period,
@@ -117,6 +119,54 @@ export async function getDashboardData(period?: Period): Promise<DashboardData> 
     demo: false,
     role: profile?.role ?? "jefe",
   };
+}
+
+/**
+ * Detalle de un empleado (identidad, horas disponibles, historial, tendencia,
+ * ranking). Devuelve null si el empleado no existe o está fuera del alcance.
+ */
+export async function getEmployeeDetail(
+  id: string
+): Promise<EmployeeDetail | null> {
+  const period = currentPeriod();
+
+  if (!isSupabaseConfigured()) {
+    // Modo demo (área autenticada sin Supabase): usar dataset de ejemplo.
+    const { demoDashboard, demoRecords } = await import("./demo");
+    const dash = demoDashboard("rrhh");
+    const status = dash.statuses.find((s) => s.id === id);
+    if (!status) return null;
+    const history = demoRecords.filter((r) => r.employeeId === id);
+    return buildEmployeeDetail(status, history, dash.statuses, dash.period);
+  }
+
+  const dash = await getDashboardData(period);
+  const status = dash.statuses.find((s) => s.id === id);
+  if (!status) return null; // fuera de alcance (RLS) o inexistente
+
+  const supabase = createClient();
+  const { data: recordsRaw } = await supabase
+    .from("weekly_records")
+    .select(
+      "employee_id, year, week, month, total_hours, overtime_hours, is_partial, has_error, error_reason, max_shift_hours"
+    )
+    .eq("employee_id", id)
+    .eq("year", period.year);
+
+  const history: WeeklyRecord[] = (recordsRaw ?? []).map((r: any) => ({
+    employeeId: r.employee_id,
+    year: r.year,
+    week: r.week,
+    month: r.month,
+    totalHours: Number(r.total_hours),
+    overtimeHours: Number(r.overtime_hours),
+    isPartial: r.is_partial,
+    hasError: r.has_error,
+    errorReason: r.error_reason ?? undefined,
+    maxShiftHours: r.max_shift_hours != null ? Number(r.max_shift_hours) : undefined,
+  }));
+
+  return buildEmployeeDetail(status, history, dash.statuses, dash.period);
 }
 
 /** Periodo actual (año, mes, semana ISO) según la fecha del servidor. */

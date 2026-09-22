@@ -1,8 +1,23 @@
+import Link from "next/link";
 import { StatusBadge } from "./StatusBadge";
 import type { EmployeeStatus } from "@/lib/aggregate";
 import { RULES } from "@/lib/overtime";
 
-export function EmployeeTable({ rows }: { rows: EmployeeStatus[] }) {
+export function EmployeeTable({
+  rows,
+  hrefBase,
+  roleParam,
+}: {
+  rows: EmployeeStatus[];
+  /** Base para el enlace de detalle, p. ej. "/empleado" o "/demo/empleado". */
+  hrefBase?: string;
+  /** Rol a preservar en el enlace (demo). */
+  roleParam?: string;
+}) {
+  const linkFor = (id: string) =>
+    hrefBase
+      ? `${hrefBase}/${id}${roleParam ? `?rol=${roleParam}` : ""}`
+      : undefined;
   if (rows.length === 0) {
     return (
       <div className="card text-center text-sm text-slate-500">
@@ -29,7 +44,16 @@ export function EmployeeTable({ rows }: { rows: EmployeeStatus[] }) {
           {rows.map((r) => (
             <tr key={r.id} className="hover:bg-slate-50">
               <td className="px-4 py-3">
-                <div className="font-medium text-slate-900">{r.name ?? r.code}</div>
+                {linkFor(r.id) ? (
+                  <Link
+                    href={linkFor(r.id)!}
+                    className="font-medium text-brand hover:text-brand-dark hover:underline"
+                  >
+                    {r.name ?? r.code}
+                  </Link>
+                ) : (
+                  <div className="font-medium text-slate-900">{r.name ?? r.code}</div>
+                )}
                 <div className="text-xs text-slate-400">
                   {r.code}
                   {r.roleTitle ? ` · ${r.roleTitle}` : ""}

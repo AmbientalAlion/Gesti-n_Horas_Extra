@@ -89,7 +89,7 @@ export default async function DashboardPage() {
         <h2 className="mb-3 text-lg font-semibold text-slate-900">
           Detalle por empleado
         </h2>
-        <EmployeeTable rows={statuses} />
+        <EmployeeTable rows={statuses} hrefBase="/empleado" />
       </section>
     </div>
   );
