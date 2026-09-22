@@ -2,7 +2,9 @@
 // Permiten ejecutar y evaluar la aplicación de inmediato.
 
 import {
+  applyFilters,
   buildEmployeeDetail,
+  buildFilterOptions,
   computeDashboardCharts,
   computeEmployeeStatuses,
   summarize,
@@ -10,6 +12,8 @@ import {
   type EmployeeDetail,
   type EmployeeInput,
   type EmployeeStatus,
+  type Filters,
+  type FilterOptions,
   type Period,
   type PlantSummary,
 } from "./aggregate";
@@ -74,18 +78,24 @@ export interface DemoDashboard {
   charts: DashboardCharts;
   period: Period;
   roleView: Role;
+  filters: Filters;
+  filterOptions: FilterOptions;
 }
 
 /**
- * Datos del dashboard de demostración para una vista de rol.
+ * Datos del dashboard de demostración para una vista de rol, con filtros
+ * globales opcionales (planta/área/jefe).
  * - jefe: solo su equipo directo (Producción).
  * - rrhh / director: toda la planta.
  */
-export function demoDashboard(roleView: Role): DemoDashboard {
-  const employees =
+export function demoDashboard(roleView: Role, filters: Filters = {}): DemoDashboard {
+  const scope =
     roleView === "jefe"
       ? demoEmployees.filter((e) => e.managerId === DEMO_JEFE_MANAGER)
       : demoEmployees;
+
+  const filterOptions = buildFilterOptions(scope);
+  const employees = applyFilters(scope, filters);
 
   const empIds = new Set(employees.map((e) => e.id));
   const records = demoRecords.filter((r) => empIds.has(r.employeeId));
@@ -97,6 +107,8 @@ export function demoDashboard(roleView: Role): DemoDashboard {
     charts: computeDashboardCharts(statuses, records, DEMO_PERIOD),
     period: DEMO_PERIOD,
     roleView,
+    filters,
+    filterOptions,
   };
 }
 

@@ -1,6 +1,7 @@
 import { DashboardView } from "@/components/DashboardView";
 import { PrintButton } from "@/components/PrintButton";
 import { demoDashboard } from "@/lib/demo";
+import type { Filters } from "@/lib/aggregate";
 import type { Role } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -14,13 +15,22 @@ const ROLE_LABEL: Record<Role, string> = {
 export default function DemoDashboard({
   searchParams,
 }: {
-  searchParams: { rol?: string };
+  searchParams: { rol?: string; planta?: string; area?: string; jefe?: string };
 }) {
   const role = (["rrhh", "director", "jefe"].includes(searchParams.rol ?? "")
     ? searchParams.rol
     : "rrhh") as Role;
 
-  const { statuses, summary, charts, period } = demoDashboard(role);
+  const filters: Filters = {
+    plant: searchParams.planta || undefined,
+    area: searchParams.area || undefined,
+    manager: searchParams.jefe || undefined,
+  };
+
+  const { statuses, summary, charts, period, filterOptions } = demoDashboard(
+    role,
+    filters
+  );
 
   return (
     <DashboardView
@@ -31,6 +41,8 @@ export default function DemoDashboard({
       scopeLabel={ROLE_LABEL[role]}
       hrefBase="/demo/empleado"
       roleParam={role}
+      filterOptions={filterOptions}
+      filters={filters}
       toolbar={<PrintButton />}
     />
   );

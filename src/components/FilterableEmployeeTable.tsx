@@ -21,25 +21,14 @@ export function FilterableEmployeeTable({
   hrefBase?: string;
   roleParam?: string;
 }) {
+  // Los filtros de planta/área/jefe son globales (arriba del dashboard). Aquí
+  // solo quedan la búsqueda por nombre/ID y el filtro por estado del semáforo.
   const [q, setQ] = useState("");
-  const [area, setArea] = useState("");
-  const [plant, setPlant] = useState("");
   const [estado, setEstado] = useState<"" | SemaphoreLevel>("");
-
-  const areas = useMemo(
-    () => [...new Set(rows.map((r) => r.area ?? "Sin área"))].sort(),
-    [rows]
-  );
-  const plants = useMemo(
-    () => [...new Set(rows.map((r) => r.plant ?? "Sin planta"))].sort(),
-    [rows]
-  );
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return rows.filter((r) => {
-      if (area && (r.area ?? "Sin área") !== area) return false;
-      if (plant && (r.plant ?? "Sin planta") !== plant) return false;
       if (estado && r.level !== estado) return false;
       if (
         term &&
@@ -49,7 +38,7 @@ export function FilterableEmployeeTable({
         return false;
       return true;
     });
-  }, [rows, q, area, plant, estado]);
+  }, [rows, q, estado]);
 
   return (
     <div className="space-y-3">
@@ -61,30 +50,6 @@ export function FilterableEmployeeTable({
           placeholder="Buscar empleado por nombre o ID…"
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:max-w-xs"
         />
-        <select
-          value={area}
-          onChange={(e) => setArea(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-        >
-          <option value="">Todas las áreas</option>
-          {areas.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </select>
-        <select
-          value={plant}
-          onChange={(e) => setPlant(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-        >
-          <option value="">Todas las plantas</option>
-          {plants.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
         <select
           value={estado}
           onChange={(e) => setEstado(e.target.value as "" | SemaphoreLevel)}

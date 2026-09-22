@@ -41,6 +41,44 @@ export interface EmployeeStatus extends EmployeeInput {
   willExceedMonthly: boolean;
 }
 
+export interface Filters {
+  plant?: string;
+  area?: string;
+  manager?: string;
+}
+
+export interface FilterOptions {
+  plants: string[];
+  areas: string[];
+  managers: string[];
+}
+
+/** Opciones de filtro (valores distintos) a partir de los empleados en alcance. */
+export function buildFilterOptions(employees: EmployeeInput[]): FilterOptions {
+  const uniq = (xs: (string | undefined)[]) =>
+    [...new Set(xs.filter((x): x is string => !!x))].sort((a, b) =>
+      a.localeCompare(b)
+    );
+  return {
+    plants: uniq(employees.map((e) => e.plant)),
+    areas: uniq(employees.map((e) => e.area)),
+    managers: uniq(employees.map((e) => e.managerName)),
+  };
+}
+
+/** Aplica los filtros (planta/área/jefe) a la lista de empleados. */
+export function applyFilters<T extends EmployeeInput>(
+  employees: T[],
+  filters: Filters
+): T[] {
+  return employees.filter((e) => {
+    if (filters.plant && (e.plant ?? "") !== filters.plant) return false;
+    if (filters.area && (e.area ?? "") !== filters.area) return false;
+    if (filters.manager && (e.managerName ?? "") !== filters.manager) return false;
+    return true;
+  });
+}
+
 export interface PlantSummary {
   totalEmployees: number;
   green: number;

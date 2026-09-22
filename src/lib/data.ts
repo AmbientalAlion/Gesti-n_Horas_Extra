@@ -2,7 +2,9 @@
 // Usa Supabase cuando está configurado; de lo contrario, datos demo.
 
 import {
+  applyFilters,
   buildEmployeeDetail,
+  buildFilterOptions,
   computeDashboardCharts,
   computeEmployeeStatuses,
   summarize,
@@ -10,12 +12,16 @@ import {
   type EmployeeDetail,
   type EmployeeInput,
   type EmployeeStatus,
+  type Filters,
+  type FilterOptions,
   type Period,
   type PlantSummary,
 } from "./aggregate";
 import { DEMO_PERIOD, demoEmployees, demoRecords, isSupabaseConfigured } from "./demo";
 import { createClient } from "./supabase/server";
 import type { Role, WeeklyRecord } from "./types";
+
+export type { Filters, FilterOptions } from "./aggregate";
 
 export interface DashboardData {
   statuses: EmployeeStatus[];
@@ -24,6 +30,8 @@ export interface DashboardData {
   period: Period;
   demo: boolean;
   role: Role | "demo";
+  filters: Filters;
+  filterOptions: FilterOptions;
 }
 
 export interface SessionProfile {
@@ -61,18 +69,27 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
  * Obtiene los datos del dashboard para el periodo indicado (por defecto el actual).
  * El alcance se aplica por RLS en Supabase (un jefe solo ve su equipo).
  */
-export async function getDashboardData(period?: Period): Promise<DashboardData> {
+export async function getDashboardData(
+  period?: Period,
+  filters: Filters = {}
+): Promise<DashboardData> {
   const p = period ?? currentPeriod();
 
   if (!isSupabaseConfigured()) {
-    const statuses = computeEmployeeStatuses(demoEmployees, demoRecords, DEMO_PERIOD);
+    const filterOptions = buildFilterOptions(demoEmployees);
+    const emps = applyFilters(demoEmployees, filters);
+    const ids = new Set(emps.map((e) => e.id));
+    const recs = demoRecords.filter((r) => ids.has(r.employeeId));
+    const statuses = computeEmployeeStatuses(emps, recs, DEMO_PERIOD);
     return {
       statuses,
       summary: summarize(statuses),
-      charts: computeDashboardCharts(statuses, demoRecords, DEMO_PERIOD),
+      charts: computeDashboardCharts(statuses, recs, DEMO_PERIOD),
       period: DEMO_PERIOD,
       demo: true,
       role: "demo",
+      filters,
+      filterOptions,
     };
   }
 
@@ -119,14 +136,21 @@ export async function getDashboardData(period?: Period): Promise<DashboardData> 
     maxShiftHours: r.max_shift_hours != null ? Number(r.max_shift_hours) : undefined,
   }));
 
-  const statuses = computeEmployeeStatuses(employees, records, p);
+  const filterOptions = buildFilterOptions(employees);
+  const filteredEmployees = applyFilters(employees, filters);
+  const ids = new Set(filteredEmployees.map((e) => e.id));
+  const filteredRecords = records.filter((r) => ids.has(r.employeeId));
+
+  const statuses = computeEmployeeStatuses(filteredEmployees, filteredRecords, p);
   return {
     statuses,
     summary: summarize(statuses),
-    charts: computeDashboardCharts(statuses, records, p),
+    charts: computeDashboardCharts(statuses, filteredRecords, p),
     period: p,
     demo: false,
     role: profile?.role ?? "jefe",
+    filters,
+    filterOptions,
   };
 }
 

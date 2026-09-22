@@ -5,9 +5,17 @@ import { TrendChart } from "./charts/TrendChart";
 import { HBarChart } from "./charts/HBarChart";
 import { Heatmap } from "./charts/Heatmap";
 import { StatusBadge } from "./StatusBadge";
+import { DashboardFilters } from "./DashboardFilters";
 import { FigureCluster } from "./brand/Figures";
 import { RULES } from "@/lib/overtime";
-import type { DashboardCharts, EmployeeStatus, Period, PlantSummary } from "@/lib/aggregate";
+import type {
+  DashboardCharts,
+  EmployeeStatus,
+  Filters,
+  FilterOptions,
+  Period,
+  PlantSummary,
+} from "@/lib/aggregate";
 
 const MONTHS = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -23,6 +31,8 @@ export function DashboardView({
   hrefBase,
   roleParam,
   toolbar,
+  filterOptions,
+  filters,
 }: {
   statuses: EmployeeStatus[];
   summary: PlantSummary;
@@ -32,6 +42,8 @@ export function DashboardView({
   hrefBase: string;
   roleParam?: string;
   toolbar?: React.ReactNode;
+  filterOptions?: FilterOptions;
+  filters?: Filters;
 }) {
   const critical = statuses
     .filter((s) => s.level === "red")
@@ -73,6 +85,10 @@ export function DashboardView({
           {toolbar && <div className="flex items-center gap-2">{toolbar}</div>}
         </div>
       </header>
+
+      {filterOptions && filters && (
+        <DashboardFilters options={filterOptions} current={filters} />
+      )}
 
       {/* KPIs */}
       <section className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">

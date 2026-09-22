@@ -2,21 +2,34 @@ import { DashboardView } from "@/components/DashboardView";
 import { MonthSelector } from "@/components/MonthSelector";
 import { PrintButton } from "@/components/PrintButton";
 import { currentPeriod, getDashboardData } from "@/lib/data";
+import type { Filters } from "@/lib/aggregate";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { mes?: string; anio?: string };
+  searchParams: {
+    mes?: string;
+    anio?: string;
+    planta?: string;
+    area?: string;
+    jefe?: string;
+  };
 }) {
   const cur = currentPeriod();
   const month = Number(searchParams.mes) || cur.month;
   const year = Number(searchParams.anio) || cur.year;
   const period = { year, month, week: cur.week };
 
-  const { statuses, summary, charts, demo, role } =
-    await getDashboardData(period);
+  const filters: Filters = {
+    plant: searchParams.planta || undefined,
+    area: searchParams.area || undefined,
+    manager: searchParams.jefe || undefined,
+  };
+
+  const { statuses, summary, charts, demo, role, filterOptions } =
+    await getDashboardData(period, filters);
 
   const scopeLabel = role === "jefe" ? "Mi equipo" : "Planta completa";
 
@@ -35,6 +48,8 @@ export default async function DashboardPage({
         period={period}
         scopeLabel={scopeLabel}
         hrefBase="/empleado"
+        filterOptions={filterOptions}
+        filters={filters}
         toolbar={
           <>
             <MonthSelector year={year} month={month} />
