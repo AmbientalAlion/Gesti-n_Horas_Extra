@@ -22,15 +22,15 @@ export function BrandMark({
     <div className={clsx("select-none", className)}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/brand/logo-alion.png"
+        src="/brand/logo-alion-trim.png"
         alt="ALIÓN — Molins + Corona"
-        className={clsx(h, "w-auto object-contain dark:hidden")}
+        className={clsx(h, "w-auto object-contain object-left dark:hidden")}
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/brand/logo-alion-dark.png"
+        src="/brand/logo-alion-dark-trim.png"
         alt="ALIÓN — Molins + Corona"
-        className={clsx(h, "hidden w-auto rounded object-contain dark:block")}
+        className={clsx(h, "hidden w-auto rounded object-contain object-left dark:block")}
       />
     </div>
   );
