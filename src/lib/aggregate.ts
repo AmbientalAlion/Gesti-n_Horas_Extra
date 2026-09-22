@@ -279,6 +279,80 @@ export function summarize(statuses: EmployeeStatus[]): PlantSummary {
   };
 }
 
+export interface AreaOvertime {
+  area: string;
+  overtime: number;
+  count: number;
+  red: number;
+}
+
+export interface WeeklyTrendPoint {
+  week: number;
+  overtime: number;
+  alerts: number;
+}
+
+export interface TopEmployee {
+  id: string;
+  name: string;
+  overtime: number;
+  level: SemaphoreLevel;
+  area: string;
+}
+
+export interface DashboardCharts {
+  byArea: AreaOvertime[];
+  weeklyTrend: WeeklyTrendPoint[];
+  topEmployees: TopEmployee[];
+}
+
+/** Datos derivados para las visualizaciones del dashboard. */
+export function computeDashboardCharts(
+  statuses: EmployeeStatus[],
+  records: WeeklyRecord[],
+  period: Period
+): DashboardCharts {
+  // Horas extra por área.
+  const areaMap = new Map<string, AreaOvertime>();
+  for (const s of statuses) {
+    const area = s.area ?? "Sin área";
+    const cur = areaMap.get(area) ?? { area, overtime: 0, count: 0, red: 0 };
+    cur.overtime = round2(cur.overtime + s.monthlyOvertime);
+    cur.count += 1;
+    if (s.level === "red") cur.red += 1;
+    areaMap.set(area, cur);
+  }
+  const byArea = [...areaMap.values()].sort((a, b) => b.overtime - a.overtime);
+
+  // Tendencia semanal de horas extra (semanas del mes en curso).
+  const weekMap = new Map<number, WeeklyTrendPoint>();
+  for (const r of records) {
+    if (r.month !== period.month || r.year !== period.year) continue;
+    const cur = weekMap.get(r.week) ?? { week: r.week, overtime: 0, alerts: 0 };
+    if (!r.hasError) {
+      cur.overtime = round2(cur.overtime + r.overtimeHours);
+      if (r.overtimeHours > RULES.WEEKLY_OVERTIME_LIMIT) cur.alerts += 1;
+    }
+    weekMap.set(r.week, cur);
+  }
+  const weeklyTrend = [...weekMap.values()].sort((a, b) => a.week - b.week);
+
+  // Top empleados por horas extra del mes.
+  const topEmployees: TopEmployee[] = statuses
+    .filter((s) => s.monthlyOvertime > 0)
+    .sort((a, b) => b.monthlyOvertime - a.monthlyOvertime)
+    .slice(0, 8)
+    .map((s) => ({
+      id: s.id,
+      name: s.name ?? s.code,
+      overtime: s.monthlyOvertime,
+      level: s.level,
+      area: s.area ?? "Sin área",
+    }));
+
+  return { byArea, weeklyTrend, topEmployees };
+}
+
 function groupBy<T, K>(items: T[], key: (item: T) => K): Map<K, T[]> {
   const map = new Map<K, T[]>();
   for (const item of items) {

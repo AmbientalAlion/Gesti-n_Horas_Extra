@@ -3,8 +3,10 @@
 
 import {
   buildEmployeeDetail,
+  computeDashboardCharts,
   computeEmployeeStatuses,
   summarize,
+  type DashboardCharts,
   type EmployeeDetail,
   type EmployeeInput,
   type EmployeeStatus,
@@ -18,6 +20,7 @@ import type { Role, WeeklyRecord } from "./types";
 export interface DashboardData {
   statuses: EmployeeStatus[];
   summary: PlantSummary;
+  charts: DashboardCharts;
   period: Period;
   demo: boolean;
   role: Role | "demo";
@@ -66,6 +69,7 @@ export async function getDashboardData(period?: Period): Promise<DashboardData> 
     return {
       statuses,
       summary: summarize(statuses),
+      charts: computeDashboardCharts(statuses, demoRecords, DEMO_PERIOD),
       period: DEMO_PERIOD,
       demo: true,
       role: "demo",
@@ -115,6 +119,7 @@ export async function getDashboardData(period?: Period): Promise<DashboardData> 
   return {
     statuses,
     summary: summarize(statuses),
+    charts: computeDashboardCharts(statuses, records, p),
     period: p,
     demo: false,
     role: profile?.role ?? "jefe",

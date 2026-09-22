@@ -3,8 +3,10 @@
 
 import {
   buildEmployeeDetail,
+  computeDashboardCharts,
   computeEmployeeStatuses,
   summarize,
+  type DashboardCharts,
   type EmployeeDetail,
   type EmployeeInput,
   type EmployeeStatus,
@@ -69,6 +71,7 @@ const DEMO_JEFE_MANAGER = "m1";
 export interface DemoDashboard {
   statuses: EmployeeStatus[];
   summary: PlantSummary;
+  charts: DashboardCharts;
   period: Period;
   roleView: Role;
 }
@@ -91,6 +94,7 @@ export function demoDashboard(roleView: Role): DemoDashboard {
   return {
     statuses,
     summary: summarize(statuses),
+    charts: computeDashboardCharts(statuses, records, DEMO_PERIOD),
     period: DEMO_PERIOD,
     roleView,
   };
