@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { WeekCalendar, type WeekDay } from "./WeekCalendar";
+import { useMemo, useState } from "react";
+import { WeekDayPicker, type WeekDayOpt } from "./WeekDayPicker";
 import { solicitarAutorizacion } from "@/app/(app)/autorizaciones/actions";
 
 const MONTHLY_LIMIT = 48;
@@ -12,6 +12,8 @@ export interface AuthEmployee {
   id: string;
   name: string;
   area: string;
+  direccion?: string;
+  plant?: string;
   monthlyOvertime: number;
 }
 
@@ -23,25 +25,44 @@ export function AuthRequestForm({
   year,
 }: {
   employees: AuthEmployee[];
-  days: WeekDay[];
+  days: WeekDayOpt[];
   weekNumber: number;
   monthLabel: string;
   year: number;
 }) {
   const [empId, setEmpId] = useState("");
-  const [hours, setHours] = useState(1);
+  const [empQuery, setEmpQuery] = useState("");
+  const [hours, setHours] = useState(2);
+  const [selected, setSelected] = useState<string[]>([]);
 
   const emp = employees.find((e) => e.id === empId);
-  const projected = emp ? emp.monthlyOvertime + (hours || 0) : null;
+
+  // Buscador incremental del empleado (nombre, ID, área, dirección, planta).
+  const matches = useMemo(() => {
+    const term = empQuery.trim().toLowerCase();
+    if (!term) return [];
+    return employees
+      .filter((e) =>
+        [e.name, e.area, e.direccion, e.plant]
+          .filter(Boolean)
+          .some((v) => v!.toLowerCase().includes(term))
+      )
+      .slice(0, 8);
+  }, [employees, empQuery]);
+
+  const requested = hours * selected.length;
+  const projected = emp ? emp.monthlyOvertime + requested : null;
 
   let warning: { tone: "red" | "yellow"; text: string } | null = null;
-  if (emp && projected != null) {
+  if (emp && projected != null && selected.length > 0) {
     if (projected > MONTHLY_LIMIT) {
       warning = {
         tone: "red",
         text: `⛔ Superaría el límite mensual: ${emp.monthlyOvertime.toFixed(
           1
-        )}h + ${hours}h = ${projected.toFixed(1)}h (máximo ${MONTHLY_LIMIT}h).`,
+        )}h + ${requested.toFixed(1)}h = ${projected.toFixed(
+          1
+        )}h (máximo ${MONTHLY_LIMIT}h del mes).`,
       };
     } else if (projected >= MONTHLY_WARNING) {
       warning = {
@@ -53,32 +74,93 @@ export function AuthRequestForm({
     }
   }
 
+  const toggle = (date: string) =>
+    setSelected((s) =>
+      s.includes(date) ? s.filter((d) => d !== date) : [...s, date].sort()
+    );
+
+  const canSubmit = !!empId && selected.length > 0 && hours > 0;
+
   return (
     <form action={solicitarAutorizacion} className="space-y-4">
-      <WeekCalendar days={days} weekNumber={weekNumber} monthLabel={monthLabel} year={year} />
+      <input type="hidden" name="employeeId" value={empId} />
+      {selected.map((d) => (
+        <input key={d} type="hidden" name="days" value={d} />
+      ))}
+
+      <WeekDayPicker
+        days={days}
+        selected={selected}
+        onToggle={toggle}
+        onSelectAll={() => setSelected(days.map((d) => d.date))}
+        onClear={() => setSelected([])}
+        weekNumber={weekNumber}
+        monthLabel={monthLabel}
+        year={year}
+      />
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="text-sm">
+        <div className="text-sm">
           <span className="mb-1 block text-slate-600">Empleado</span>
-          <select
-            name="employeeId"
-            required
-            value={empId}
-            onChange={(e) => setEmpId(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-          >
-            <option value="">Seleccione…</option>
-            {employees.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.name} — {e.area} ({e.monthlyOvertime.toFixed(0)}h/mes)
-              </option>
-            ))}
-          </select>
-        </label>
+          {emp ? (
+            <div className="flex items-center justify-between rounded-lg border border-brand/40 bg-brand-tint px-3 py-2">
+              <span className="font-medium text-brand-dark">
+                {emp.name}
+                <span className="ml-1 text-xs font-normal text-slate-500">
+                  {emp.area} · {emp.monthlyOvertime.toFixed(0)}h/mes
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmpId("");
+                  setEmpQuery("");
+                }}
+                className="text-xs text-brand hover:text-brand-dark"
+              >
+                cambiar
+              </button>
+            </div>
+          ) : (
+            <div className="relative">
+              <input
+                type="search"
+                value={empQuery}
+                onChange={(e) => setEmpQuery(e.target.value)}
+                placeholder="Escriba nombre, área o dirección…"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                autoComplete="off"
+              />
+              {matches.length > 0 && (
+                <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                  {matches.map((m) => (
+                    <li key={m.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmpId(m.id);
+                          setEmpQuery("");
+                        }}
+                        className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-brand-tint"
+                      >
+                        <span className="font-medium text-slate-900">{m.name}</span>
+                        <span className="text-xs text-slate-500">
+                          {m.area}
+                          {m.direccion ? ` · ${m.direccion}` : ""} ·{" "}
+                          {m.monthlyOvertime.toFixed(0)}h/mes
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
 
         <label className="text-sm">
           <span className="mb-1 block text-slate-600">
-            Horas extra (máximo {MAX_HOURS})
+            Horas por día (máximo {MAX_HOURS})
           </span>
           <input
             name="hours"
@@ -102,6 +184,14 @@ export function AuthRequestForm({
         className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
       />
 
+      {selected.length > 0 && emp && (
+        <div className="rounded-lg border border-brand/30 bg-brand-tint px-3 py-2 text-sm text-brand-dark">
+          Total solicitado: <strong>{requested.toFixed(1)}h</strong> ({selected.length}{" "}
+          día{selected.length > 1 ? "s" : ""} × {hours}h). Proyección del mes:{" "}
+          <strong>≈ {projected?.toFixed(1)}h</strong> de {MONTHLY_LIMIT}h.
+        </div>
+      )}
+
       {warning && (
         <div
           className={
@@ -114,7 +204,7 @@ export function AuthRequestForm({
         </div>
       )}
 
-      <button className="btn-primary text-sm" type="submit">
+      <button className="btn-primary text-sm disabled:opacity-50" type="submit" disabled={!canSubmit}>
         Solicitar autorización
       </button>
     </form>

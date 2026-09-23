@@ -1,5 +1,6 @@
 import { StatCard } from "./StatCard";
 import { FilterableEmployeeTable } from "./FilterableEmployeeTable";
+import { EmployeeSearch } from "./EmployeeSearch";
 import { DonutChart } from "./charts/DonutChart";
 import { TrendChart } from "./charts/TrendChart";
 import { HBarChart } from "./charts/HBarChart";
@@ -8,6 +9,7 @@ import { StatusBadge } from "./StatusBadge";
 import { DashboardFilters } from "./DashboardFilters";
 import { FigureCluster } from "./brand/Figures";
 import { RULES } from "@/lib/overtime";
+import type { Role } from "@/lib/types";
 import type {
   DashboardCharts,
   EmployeeStatus,
@@ -16,6 +18,29 @@ import type {
   Period,
   PlantSummary,
 } from "@/lib/aggregate";
+
+const ROLE_FOCUS: Record<Role | "demo", { tag: string; focus: string }> = {
+  rrhh: {
+    tag: "Recursos Humanos",
+    focus:
+      "Vista global de la planta: cumplimiento legal del mes y cargas por dirección, área y sede.",
+  },
+  director: {
+    tag: "Dirección de planta",
+    focus:
+      "Comparativo por sede y dirección, proyección de cierre de mes y solicitudes por aprobar.",
+  },
+  jefe: {
+    tag: "Jefe inmediato",
+    focus:
+      "Su equipo: quién se acerca al límite mensual y quién tiene horas disponibles para turnos.",
+  },
+  demo: {
+    tag: "Demostración",
+    focus:
+      "Explore la herramienta cambiando de rol y filtrando por planta, dirección, área o jefe.",
+  },
+};
 
 const MONTHS = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -30,6 +55,7 @@ export function DashboardView({
   scopeLabel,
   hrefBase,
   roleParam,
+  role = "demo",
   toolbar,
   filterOptions,
   filters,
@@ -41,6 +67,7 @@ export function DashboardView({
   scopeLabel: string;
   hrefBase: string;
   roleParam?: string;
+  role?: Role | "demo";
   toolbar?: React.ReactNode;
   filterOptions?: FilterOptions;
   filters?: Filters;
@@ -76,15 +103,24 @@ export function DashboardView({
         <FigureCluster />
         <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div>
+            <div className="mb-1 inline-flex items-center gap-2">
+              <span className="rounded-full bg-brand px-2.5 py-0.5 text-[11px] font-semibold text-white">
+                {ROLE_FOCUS[role].tag}
+              </span>
+            </div>
             <h1 className="text-2xl font-bold text-brand-dark">Panel de control</h1>
             <p className="text-sm text-slate-500">
               {scopeLabel} · Semana {period.week} · {MONTHS[period.month - 1]}{" "}
               {period.year}
             </p>
+            <p className="mt-1 max-w-xl text-xs text-slate-500">{ROLE_FOCUS[role].focus}</p>
           </div>
           {toolbar && <div className="flex items-center gap-2">{toolbar}</div>}
         </div>
       </header>
+
+      {/* Buscador rápido de empleados (typeahead). */}
+      <EmployeeSearch rows={statuses} hrefBase={hrefBase} roleParam={roleParam} />
 
       {filterOptions && filters && (
         <DashboardFilters options={filterOptions} current={filters} />

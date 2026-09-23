@@ -60,18 +60,30 @@ export interface FilterOptions {
   managers: string[];
 }
 
-/** Opciones de filtro (valores distintos) a partir de los empleados en alcance. */
-export function buildFilterOptions(employees: EmployeeInput[]): FilterOptions {
+/**
+ * Opciones de filtro en cascada: cada dimensión muestra solo los valores que
+ * siguen siendo posibles dadas las OTRAS selecciones activas. Así, al elegir la
+ * planta "RIO CLARO", los desplegables de dirección/área/centro de costo/jefe se
+ * limitan a esa locación (faceted search). Sin filtros, muestra todo el alcance.
+ */
+export function buildFilterOptions(
+  employees: EmployeeInput[],
+  filters: Filters = {}
+): FilterOptions {
   const uniq = (xs: (string | undefined)[]) =>
     [...new Set(xs.filter((x): x is string => !!x))].sort((a, b) =>
-      a.localeCompare(b)
+      a.localeCompare(b, "es")
     );
+  // Para cada dimensión, aplica todos los filtros MENOS el propio, de modo que
+  // sus opciones reflejen el resto de la selección pero no se auto-restrinjan.
+  const opts = (self: keyof Filters, pick: (e: EmployeeInput) => string | undefined) =>
+    uniq(applyFilters(employees, { ...filters, [self]: undefined }).map(pick));
   return {
-    plants: uniq(employees.map((e) => e.plant)),
-    directions: uniq(employees.map((e) => e.direccion)),
-    areas: uniq(employees.map((e) => e.area)),
-    costCenters: uniq(employees.map((e) => e.costCenter)),
-    managers: uniq(employees.map((e) => e.managerName)),
+    plants: opts("plant", (e) => e.plant),
+    directions: opts("direccion", (e) => e.direccion),
+    areas: opts("area", (e) => e.area),
+    costCenters: opts("costCenter", (e) => e.costCenter),
+    managers: opts("manager", (e) => e.managerName),
   };
 }
 

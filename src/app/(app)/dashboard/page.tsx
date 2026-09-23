@@ -52,6 +52,7 @@ export default async function DashboardPage({
         period={period}
         scopeLabel={scopeLabel}
         hrefBase="/empleado"
+        role={role === "demo" ? "demo" : role}
         filterOptions={filterOptions}
         filters={filters}
         toolbar={

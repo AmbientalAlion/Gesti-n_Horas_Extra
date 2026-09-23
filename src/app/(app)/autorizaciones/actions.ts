@@ -14,6 +14,11 @@ export async function solicitarAutorizacion(formData: FormData) {
   const employeeId = String(formData.get("employeeId"));
   const hours = Number(formData.get("hours"));
   const reason = String(formData.get("reason") ?? "").trim();
+  // Uno o varios días de la semana en curso (ISO yyyy-mm-dd).
+  const days = formData
+    .getAll("days")
+    .map((d) => String(d))
+    .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
 
   // La semana siempre es la actual (regla de simplificación).
   const { year, week } = currentPeriod();
@@ -23,20 +28,26 @@ export async function solicitarAutorizacion(formData: FormData) {
   }
   if (hours > RULES.MAX_AUTHORIZATION_HOURS) {
     throw new Error(
-      `El máximo por solicitud es ${RULES.MAX_AUTHORIZATION_HOURS} horas.`
+      `El máximo por día es ${RULES.MAX_AUTHORIZATION_HOURS} horas.`
     );
+  }
+  if (days.length === 0) {
+    throw new Error("Seleccione al menos un día de la semana.");
   }
 
   const supabase = createClient();
-  const { error } = await supabase.from("overtime_authorizations").insert({
+  // Una fila por día seleccionado (permite solicitar toda la semana de una vez).
+  const rows = days.map((day) => ({
     employee_id: employeeId,
     year,
     week,
+    day_date: day,
     hours,
     reason: reason || null,
     requested_by: profile.id,
     status: "solicitada",
-  });
+  }));
+  const { error } = await supabase.from("overtime_authorizations").insert(rows);
   if (error) throw new Error(error.message);
   revalidatePath("/autorizaciones");
 }

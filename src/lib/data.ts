@@ -76,7 +76,7 @@ export async function getDashboardData(
   const p = period ?? currentPeriod();
 
   if (!isSupabaseConfigured()) {
-    const filterOptions = buildFilterOptions(demoEmployees);
+    const filterOptions = buildFilterOptions(demoEmployees, filters);
     const emps = applyFilters(demoEmployees, filters);
     const ids = new Set(emps.map((e) => e.id));
     const recs = demoRecords.filter((r) => ids.has(r.employeeId));
@@ -137,7 +137,7 @@ export async function getDashboardData(
     maxShiftHours: r.max_shift_hours != null ? Number(r.max_shift_hours) : undefined,
   }));
 
-  const filterOptions = buildFilterOptions(employees);
+  const filterOptions = buildFilterOptions(employees, filters);
   const filteredEmployees = applyFilters(employees, filters);
   const ids = new Set(filteredEmployees.map((e) => e.id));
   const filteredRecords = records.filter((r) => ids.has(r.employeeId));
@@ -220,6 +220,48 @@ export async function getEmployeeDetail(
 
 function sum(rows: any[], key: string): number {
   return Math.round(rows.reduce((a, r) => a + Number(r[key] ?? 0), 0) * 100) / 100;
+}
+
+export interface PendingAuth {
+  id: string;
+  employeeName: string;
+  area: string;
+  hours: number;
+  dayDate: string | null;
+  week: number;
+  requestedAt: string;
+}
+
+/**
+ * Solicitudes de autorización pendientes ("solicitada") visibles para quien
+ * aprueba (Director de planta o RRHH). Alimenta la campanita de notificaciones.
+ * Devuelve [] para otros roles o cuando no hay Supabase.
+ */
+export async function getPendingAuthorizations(): Promise<PendingAuth[]> {
+  if (!isSupabaseConfigured()) return [];
+  const profile = await getSessionProfile();
+  if (!profile || (profile.role !== "rrhh" && profile.role !== "director")) {
+    return [];
+  }
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("overtime_authorizations")
+    .select(
+      "id, hours, day_date, week, requested_at, employees(name, code, area)"
+    )
+    .eq("status", "solicitada")
+    .order("requested_at", { ascending: false })
+    .limit(30);
+
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    employeeName: r.employees?.name ?? r.employees?.code ?? "—",
+    area: r.employees?.area ?? "—",
+    hours: Number(r.hours),
+    dayDate: r.day_date ?? null,
+    week: r.week,
+    requestedAt: r.requested_at,
+  }));
 }
 
 /** Periodo actual (año, mes, semana ISO) según la fecha del servidor. */

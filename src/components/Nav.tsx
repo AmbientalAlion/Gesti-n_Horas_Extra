@@ -4,12 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import type { Role } from "@/lib/types";
+import type { PendingAuth } from "@/lib/data";
 import { signOut } from "@/app/login/actions";
 import { BrandMark, Claim } from "@/components/brand/BrandMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { NotificationBell } from "@/components/NotificationBell";
 
 interface NavProps {
   role: Role | "demo";
+  pending?: PendingAuth[];
 }
 
 const ROLE_LABELS: Record<Role | "demo", string> = {
@@ -19,9 +22,10 @@ const ROLE_LABELS: Record<Role | "demo", string> = {
   demo: "Modo demostración",
 };
 
-export function Nav({ role }: NavProps) {
+export function Nav({ role, pending = [] }: NavProps) {
   const pathname = usePathname();
   const isRrhh = role === "rrhh" || role === "demo";
+  const canApprove = role === "rrhh" || role === "director";
 
   const links = [
     { href: "/dashboard", label: "Dashboard" },
@@ -35,7 +39,12 @@ export function Nav({ role }: NavProps) {
   return (
     <aside className="flex w-full shrink-0 flex-col border-b border-slate-200 bg-white print:hidden lg:w-60 lg:border-b-0 lg:border-r">
       <div className="border-b border-slate-200 px-5 py-5">
-        <BrandMark size="md" />
+        <div className="flex items-start justify-between gap-2">
+          <BrandMark size="md" />
+          {canApprove && (
+            <NotificationBell items={pending} href="/autorizaciones" />
+          )}
+        </div>
         <div className="mt-2 text-xs text-slate-500">Control de Horas Extras</div>
         <Claim className="mt-1 block text-[11px]" />
       </div>

@@ -94,7 +94,7 @@ export function demoDashboard(roleView: Role, filters: Filters = {}): DemoDashbo
       ? demoEmployees.filter((e) => e.managerId === DEMO_JEFE_MANAGER)
       : demoEmployees;
 
-  const filterOptions = buildFilterOptions(scope);
+  const filterOptions = buildFilterOptions(scope, filters);
   const employees = applyFilters(scope, filters);
 
   const empIds = new Set(employees.map((e) => e.id));

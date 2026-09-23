@@ -3,7 +3,7 @@ import { getSessionProfile, getDashboardData, currentPeriod } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { decidirAutorizacion } from "./actions";
 import { AuthRequestForm, type AuthEmployee } from "@/components/AuthRequestForm";
-import type { WeekDay } from "@/components/WeekCalendar";
+import type { WeekDayOpt } from "@/components/WeekDayPicker";
 import { RULES } from "@/lib/overtime";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +20,13 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   rechazada: { label: "Rechazada", cls: "text-status-red" },
 };
 
-function currentWeekDays(): WeekDay[] {
+function iso(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+}
+
+function currentWeekDays(): WeekDayOpt[] {
   const now = new Date();
   const dow = now.getDay() || 7;
   const monday = new Date(now);
@@ -29,11 +35,19 @@ function currentWeekDays(): WeekDay[] {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
     return {
+      date: iso(d),
       dow: DOW[i],
       day: d.getDate(),
       isToday: d.toDateString() === now.toDateString(),
     };
   });
+}
+
+function formatDay(dateStr?: string | null): string | null {
+  if (!dateStr) return null;
+  const [y, m, d] = dateStr.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return `${DOW[(new Date(y, m - 1, d).getDay() || 7) - 1]} ${d}/${m}`;
 }
 
 export default async function AutorizacionesPage() {
@@ -48,7 +62,7 @@ export default async function AutorizacionesPage() {
     supabase
       .from("overtime_authorizations")
       .select(
-        "id, year, week, hours, reason, status, requested_at, decided_at, decision_note, employee_id, employees(code, name, area)"
+        "id, year, week, day_date, hours, reason, status, requested_at, decided_at, decision_note, employee_id, employees(code, name, area)"
       )
       .order("requested_at", { ascending: false }),
   ]);
@@ -59,6 +73,8 @@ export default async function AutorizacionesPage() {
       id: s.id,
       name: s.name ?? s.code,
       area: s.area ?? "—",
+      direccion: s.direccion,
+      plant: s.plant,
       monthlyOvertime: s.monthlyOvertime,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -74,8 +90,9 @@ export default async function AutorizacionesPage() {
           Autorización previa de horas extra
         </h1>
         <p className="text-sm text-slate-500">
-          El jefe solicita (máximo {RULES.MAX_AUTHORIZATION_HOURS}h, semana en
-          curso); el Director de planta o RRHH aprueban o rechazan.
+          El jefe selecciona los días de la semana en curso (máximo{" "}
+          {RULES.MAX_AUTHORIZATION_HOURS}h por día); el Director de planta o RRHH
+          aprueban o rechazan.
         </p>
       </header>
 
@@ -118,7 +135,10 @@ export default async function AutorizacionesPage() {
                         {r.employees?.name ?? r.employees?.code} · {r.employees?.area ?? "—"}
                       </div>
                       <div className="text-xs text-slate-500">
-                        Semana {r.week} · {r.year} · {Number(r.hours).toFixed(1)}h extra
+                        {formatDay(r.day_date)
+                          ? `${formatDay(r.day_date)} · `
+                          : `Semana ${r.week} · `}
+                        {r.year} · {Number(r.hours).toFixed(1)}h extra
                         {r.reason ? ` · ${r.reason}` : ""}
                       </div>
                       {flag && (

@@ -5,6 +5,16 @@ import type { FilterOptions, Filters } from "@/lib/aggregate";
 
 const KEYS = ["planta", "direccion", "area", "ceco", "jefe"];
 
+// Al cambiar un filtro más amplio, se limpian los dependientes para no dejar
+// selecciones incoherentes (p. ej. una planta nueva con un área de otra sede).
+const DEPENDENTS: Record<string, string[]> = {
+  planta: ["direccion", "area", "ceco", "jefe"],
+  direccion: ["area", "ceco", "jefe"],
+  area: ["ceco"],
+  ceco: ["area"],
+  jefe: [],
+};
+
 export function DashboardFilters({
   options,
   current,
@@ -19,6 +29,7 @@ export function DashboardFilters({
     const next = new URLSearchParams(params.toString());
     if (value) next.set(key, value);
     else next.delete(key);
+    for (const dep of DEPENDENTS[key] ?? []) next.delete(dep);
     router.push(`?${next.toString()}`);
   };
 

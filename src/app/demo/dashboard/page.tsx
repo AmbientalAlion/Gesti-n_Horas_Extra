@@ -50,6 +50,7 @@ export default function DemoDashboard({
       scopeLabel={ROLE_LABEL[role]}
       hrefBase="/demo/empleado"
       roleParam={role}
+      role={role}
       filterOptions={filterOptions}
       filters={filters}
       toolbar={<PrintButton />}
