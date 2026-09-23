@@ -29,7 +29,7 @@ export function EmployeeTable({
   return (
     <div className="card overflow-x-auto p-0">
       <table className="min-w-full divide-y divide-slate-200 text-sm">
-        <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+        <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 [&_th]:whitespace-nowrap">
           <tr>
             <th className="px-4 py-3 font-medium">Empleado</th>
             <th className="px-4 py-3 font-medium">Área</th>
@@ -65,9 +65,17 @@ export function EmployeeTable({
                   </div>
                 )}
               </td>
-              <td className="px-4 py-3 text-slate-600">{r.area ?? "—"}</td>
-              <td className="px-4 py-3 text-slate-600">{r.managerName ?? "—"}</td>
-              <td className="px-4 py-3 text-right tabular-nums">
+              <td className="px-4 py-3 text-slate-600">
+                <span className="block max-w-[14rem] truncate" title={r.area ?? "—"}>
+                  {r.area ?? "—"}
+                </span>
+              </td>
+              <td className="px-4 py-3 text-slate-600">
+                <span className="block max-w-[12rem] truncate" title={r.managerName ?? "—"}>
+                  {r.managerName ?? "—"}
+                </span>
+              </td>
+              <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
                 <span className="text-slate-700">{r.weeklyOvertime.toFixed(1)}h</span>
                 {r.weeklyHigh && (
                   <span
@@ -78,7 +86,7 @@ export function EmployeeTable({
                   </span>
                 )}
               </td>
-              <td className="px-4 py-3 text-right tabular-nums">
+              <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
                 <span
                   className={
                     r.monthlyOvertime > RULES.MONTHLY_OVERTIME_LIMIT
@@ -91,10 +99,10 @@ export function EmployeeTable({
                   {r.monthlyOvertime.toFixed(1)}h
                 </span>
               </td>
-              <td className="px-4 py-3 text-right tabular-nums text-slate-600">
+              <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-600">
                 {r.availableMonthly.toFixed(1)}h
               </td>
-              <td className="px-4 py-3 text-xs">
+              <td className="whitespace-nowrap px-4 py-3 text-xs">
                 <span className={r.willExceedMonthly ? "font-medium text-status-red" : "text-slate-500"}>
                   ≈ {r.projectedMonthlyOvertime.toFixed(1)}h/mes
                   {r.willExceedMonthly ? " (excede 48h)" : ""}

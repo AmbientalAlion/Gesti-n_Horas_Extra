@@ -16,10 +16,12 @@ const TONES: Record<NonNullable<StatCardProps["tone"]>, string> = {
 
 export function StatCard({ label, value, hint, tone = "default" }: StatCardProps) {
   return (
-    <div className="card">
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className={clsx("mt-1 text-3xl font-semibold", TONES[tone])}>{value}</p>
-      {hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
+    <div className="card flex flex-col">
+      <p className="text-xs leading-snug text-slate-500 sm:text-sm">{label}</p>
+      <p className={clsx("mt-1 text-2xl font-semibold leading-tight sm:text-3xl", TONES[tone])}>
+        {value}
+      </p>
+      {hint && <p className="mt-auto pt-1 text-xs text-slate-400">{hint}</p>}
     </div>
   );
 }

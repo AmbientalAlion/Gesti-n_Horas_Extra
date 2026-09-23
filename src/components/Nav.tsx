@@ -37,7 +37,7 @@ export function Nav({ role, pending = [] }: NavProps) {
   ];
 
   return (
-    <aside className="flex w-full shrink-0 flex-col border-b border-slate-200 bg-white print:hidden lg:w-60 lg:border-b-0 lg:border-r">
+    <aside className="flex w-full shrink-0 flex-col border-b border-slate-200 bg-white print:hidden lg:sticky lg:top-0 lg:h-screen lg:w-60 lg:overflow-y-auto lg:border-b-0 lg:border-r">
       <div className="border-b border-slate-200 px-5 py-5">
         <div className="flex items-start justify-between gap-2">
           <BrandMark size="md" />

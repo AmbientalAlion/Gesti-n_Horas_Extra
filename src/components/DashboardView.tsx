@@ -1,6 +1,7 @@
 import { StatCard } from "./StatCard";
 import { FilterableEmployeeTable } from "./FilterableEmployeeTable";
 import { EmployeeSearch } from "./EmployeeSearch";
+import { CollapsibleCard } from "./CollapsibleCard";
 import { DonutChart } from "./charts/DonutChart";
 import { TrendChart } from "./charts/TrendChart";
 import { HBarChart } from "./charts/HBarChart";
@@ -158,173 +159,187 @@ export function DashboardView({
       </section>
 
       {/* Gráficos */}
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div className="card">
-          <h2 className="mb-4 text-sm font-semibold text-brand-dark">
-            Distribución del estado
-          </h2>
-          <DonutChart
-            centerLabel="empleados"
-            segments={[
-              { label: "Normal", value: summary.green, color: "#16a34a" },
-              { label: "Preventivo", value: summary.yellow, color: "#FF8400" },
-              { label: "Crítico", value: summary.red, color: "#dc2626" },
-            ]}
-          />
-        </div>
+      <CollapsibleCard
+        title="Gráficos y distribución"
+        subtitle="Toca una barra de área, planta o dirección para filtrar el panel completo."
+      >
+        <div className="grid gap-5 lg:grid-cols-2">
+          <div className="rounded-lg border border-slate-100 p-4">
+            <h3 className="mb-4 text-sm font-semibold text-brand-dark">
+              Distribución del estado
+            </h3>
+            <DonutChart
+              centerLabel="empleados"
+              segments={[
+                { label: "Normal", value: summary.green, color: "#16a34a" },
+                { label: "Preventivo", value: summary.yellow, color: "#FF8400" },
+                { label: "Crítico", value: summary.red, color: "#dc2626" },
+              ]}
+            />
+          </div>
 
-        <div className="card">
-          <h2 className="mb-1 text-sm font-semibold text-brand-dark">
-            Horas extra por semana
-          </h2>
-          <p className="mb-2 text-xs text-slate-400">
-            Total del alcance · consumo del límite legal ≈ {avgConsumption.toFixed(0)}%
-            del presupuesto mensual
-          </p>
-          <TrendChart
-            points={charts.weeklyTrend.map((w) => ({
-              label: `Sem ${w.week}`,
-              value: w.overtime,
-            }))}
-          />
-        </div>
+          <div className="rounded-lg border border-slate-100 p-4">
+            <h3 className="mb-1 text-sm font-semibold text-brand-dark">
+              Horas extra por semana
+            </h3>
+            <p className="mb-3 text-xs text-slate-400">
+              Total del alcance · consumo del límite legal ≈{" "}
+              {avgConsumption.toFixed(0)}% del presupuesto mensual
+            </p>
+            <TrendChart
+              points={charts.weeklyTrend.map((w) => ({
+                label: `Sem ${w.week}`,
+                value: w.overtime,
+              }))}
+            />
+          </div>
 
-        <div className="card">
-          <h2 className="mb-4 text-sm font-semibold text-brand-dark">
-            Horas extra por área
-          </h2>
-          <HBarChart
-            items={charts.byArea.map((a) => ({
-              label: a.area,
-              value: a.overtime,
-              sublabel: `${a.count} pers.${a.red ? ` · ${a.red} crítico` : ""}`,
-            }))}
-          />
-        </div>
+          <div className="rounded-lg border border-slate-100 p-4">
+            <h3 className="mb-4 text-sm font-semibold text-brand-dark">
+              Horas extra por área <span className="font-normal text-slate-400">· toca para filtrar</span>
+            </h3>
+            <HBarChart
+              drill={{ param: "area", clear: ["ceco"] }}
+              items={charts.byArea.map((a) => ({
+                label: a.area,
+                value: a.overtime,
+                sublabel: `${a.count} pers.${a.red ? ` · ${a.red} crítico` : ""}`,
+              }))}
+            />
+          </div>
 
-        <div className="card">
-          <h2 className="mb-4 text-sm font-semibold text-brand-dark">
-            Top empleados por horas extra
-          </h2>
-          <HBarChart
-            items={charts.topEmployees.map((t) => ({
-              label: t.name,
-              value: t.overtime,
-              level: t.level,
-              sublabel: t.area,
-              href: empLink(t.id),
-            }))}
-          />
-        </div>
+          <div className="rounded-lg border border-slate-100 p-4">
+            <h3 className="mb-4 text-sm font-semibold text-brand-dark">
+              Top empleados por horas extra
+            </h3>
+            <HBarChart
+              items={charts.topEmployees.map((t) => ({
+                label: t.name,
+                value: t.overtime,
+                level: t.level,
+                sublabel: t.area,
+                href: empLink(t.id),
+              }))}
+            />
+          </div>
 
-        <div className="card">
-          <h2 className="mb-4 text-sm font-semibold text-brand-dark">
-            Horas extra por planta
-          </h2>
-          <HBarChart
-            color="#00CBBF"
-            items={charts.byPlant.map((g) => ({
-              label: g.label,
-              value: g.overtime,
-              sublabel: `${g.count} pers.${g.red ? ` · ${g.red} crítico` : ""}`,
-            }))}
-          />
-        </div>
+          <div className="rounded-lg border border-slate-100 p-4">
+            <h3 className="mb-4 text-sm font-semibold text-brand-dark">
+              Horas extra por planta <span className="font-normal text-slate-400">· toca para filtrar</span>
+            </h3>
+            <HBarChart
+              color="#00CBBF"
+              drill={{ param: "planta", clear: ["direccion", "area", "ceco", "jefe"] }}
+              items={charts.byPlant.map((g) => ({
+                label: g.label,
+                value: g.overtime,
+                sublabel: `${g.count} pers.${g.red ? ` · ${g.red} crítico` : ""}`,
+              }))}
+            />
+          </div>
 
-        <div className="card">
-          <h2 className="mb-4 text-sm font-semibold text-brand-dark">
-            Horas extra por dirección
-          </h2>
-          <HBarChart
-            color="#003865"
-            items={charts.byDireccion.map((g) => ({
-              label: g.label,
-              value: g.overtime,
-              sublabel: `${g.count} pers.${g.red ? ` · ${g.red} crítico` : ""}`,
-            }))}
-          />
+          <div className="rounded-lg border border-slate-100 p-4">
+            <h3 className="mb-4 text-sm font-semibold text-brand-dark">
+              Horas extra por dirección <span className="font-normal text-slate-400">· toca para filtrar</span>
+            </h3>
+            <HBarChart
+              color="#003865"
+              drill={{ param: "direccion", clear: ["area", "ceco", "jefe"] }}
+              items={charts.byDireccion.map((g) => ({
+                label: g.label,
+                value: g.overtime,
+                sublabel: `${g.count} pers.${g.red ? ` · ${g.red} crítico` : ""}`,
+              }))}
+            />
+          </div>
         </div>
-      </section>
+      </CollapsibleCard>
 
       {/* Heatmap área × semana */}
-      <section className="card">
-        <h2 className="mb-4 text-sm font-semibold text-brand-dark">
-          Mapa de calor · horas extra por área y semana
-        </h2>
+      <CollapsibleCard
+        title="Mapa de calor · horas extra por área y semana"
+        subtitle="Más oscuro = más horas. Desplácese en horizontal para ver todas las semanas."
+        defaultOpen={false}
+      >
         <Heatmap data={charts.heatmap} />
-      </section>
+      </CollapsibleCard>
 
       {/* Proyección de cierre + reincidentes */}
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div className="card">
-          <h2 className="mb-3 text-sm font-semibold text-brand-dark">
-            Proyección de cierre de mes · en riesgo de superar 48h
-          </h2>
-          {atRisk.length === 0 ? (
-            <p className="py-4 text-center text-sm text-slate-400">
-              Ningún empleado proyecta superar el límite mensual.
-            </p>
-          ) : (
-            <ul className="divide-y divide-slate-100 text-sm">
-              {atRisk.map((s) => (
-                <li key={s.id} className="flex items-center gap-2 py-2">
-                  <a
-                    href={empLink(s.id)}
-                    className="font-medium text-brand hover:underline"
-                  >
-                    {s.name ?? s.code}
-                  </a>
-                  <span className="text-xs text-slate-400">{s.area}</span>
-                  <span className="ml-auto tabular-nums text-slate-600">
-                    {s.monthlyOvertime.toFixed(0)}h →{" "}
-                    <span className="font-semibold text-status-yellow">
-                      ≈{s.projectedMonthlyOvertime.toFixed(0)}h
+      <CollapsibleCard
+        title="Proyección de cierre y reincidentes"
+        subtitle="Quién superaría las 48h del mes y quién repite semanas altas."
+        defaultOpen={false}
+      >
+        <div className="grid gap-5 lg:grid-cols-2">
+          <div className="rounded-lg border border-slate-100 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-brand-dark">
+              En riesgo de superar 48h
+            </h3>
+            {atRisk.length === 0 ? (
+              <p className="py-4 text-center text-sm text-slate-400">
+                Ningún empleado proyecta superar el límite mensual.
+              </p>
+            ) : (
+              <ul className="divide-y divide-slate-100 text-sm">
+                {atRisk.map((s) => (
+                  <li key={s.id} className="flex items-center gap-2 py-2.5">
+                    <a
+                      href={empLink(s.id)}
+                      className="min-w-0 truncate font-medium text-brand-dark hover:underline"
+                    >
+                      {s.name ?? s.code}
+                    </a>
+                    <span className="hidden truncate text-xs text-slate-400 sm:block">
+                      {s.area}
                     </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+                    <span className="ml-auto shrink-0 tabular-nums text-slate-600">
+                      {s.monthlyOvertime.toFixed(0)}h →{" "}
+                      <span className="font-semibold text-status-yellow">
+                        ≈{s.projectedMonthlyOvertime.toFixed(0)}h
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
-        <div className="card">
-          <h2 className="mb-3 text-sm font-semibold text-brand-dark">
-            Reincidentes · 2+ semanas por encima de 12h
-          </h2>
-          {charts.reincidentes.length === 0 ? (
-            <p className="py-4 text-center text-sm text-slate-400">
-              Sin reincidentes este mes.
-            </p>
-          ) : (
-            <ul className="divide-y divide-slate-100 text-sm">
-              {charts.reincidentes.map((r) => (
-                <li key={r.id} className="flex items-center gap-2 py-2">
-                  <a
-                    href={empLink(r.id)}
-                    className="font-medium text-brand hover:underline"
-                  >
-                    {r.name}
-                  </a>
-                  <span className="text-xs text-slate-400">{r.area}</span>
-                  <StatusBadge level={r.level} />
-                  <span className="ml-auto text-xs font-medium text-slate-600">
-                    {r.weeksHigh} semanas altas
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="rounded-lg border border-slate-100 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-brand-dark">
+              Reincidentes · 2+ semanas por encima de 12h
+            </h3>
+            {charts.reincidentes.length === 0 ? (
+              <p className="py-4 text-center text-sm text-slate-400">
+                Sin reincidentes este mes.
+              </p>
+            ) : (
+              <ul className="divide-y divide-slate-100 text-sm">
+                {charts.reincidentes.map((r) => (
+                  <li key={r.id} className="flex items-center gap-2 py-2.5">
+                    <a
+                      href={empLink(r.id)}
+                      className="min-w-0 truncate font-medium text-brand-dark hover:underline"
+                    >
+                      {r.name}
+                    </a>
+                    <StatusBadge level={r.level} />
+                    <span className="ml-auto shrink-0 text-xs font-medium text-slate-600">
+                      {r.weeksHigh} semanas altas
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
-      </section>
+      </CollapsibleCard>
 
       {/* Rotación equitativa */}
-      <section className="card">
-        <h2 className="mb-1 text-sm font-semibold text-brand-dark">
-          Rotación equitativa · candidatos con más horas disponibles
-        </h2>
-        <p className="mb-3 text-xs text-slate-400">
-          Sugerencia para repartir turnos sin acercar a nadie al límite mensual.
-        </p>
+      <CollapsibleCard
+        title="Rotación equitativa · candidatos con más horas disponibles"
+        subtitle="Sugerencia para repartir turnos sin acercar a nadie al límite mensual."
+        defaultOpen={false}
+      >
         {rotation.length === 0 ? (
           <p className="py-4 text-center text-sm text-slate-400">Sin candidatos.</p>
         ) : (
@@ -340,7 +355,7 @@ export function DashboardView({
             }))}
           />
         )}
-      </section>
+      </CollapsibleCard>
 
       {critical.length > 0 && (
         <section className="card border-red-200 bg-red-50">
@@ -358,16 +373,21 @@ export function DashboardView({
         </section>
       )}
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold text-brand-dark">
-          Detalle por empleado
-        </h2>
+      <CollapsibleCard
+        title="Detalle por empleado"
+        subtitle="Busque, filtre por estado y abra la ficha de cada persona."
+        badge={
+          <span className="rounded-full bg-brand-tint px-2.5 py-1 text-xs font-medium text-brand-dark">
+            {statuses.length} personas
+          </span>
+        }
+      >
         <FilterableEmployeeTable
           rows={statuses}
           hrefBase={hrefBase}
           roleParam={roleParam}
         />
-      </section>
+      </CollapsibleCard>
     </div>
   );
 }
