@@ -79,7 +79,9 @@ export function AuthRequestForm({
       s.includes(date) ? s.filter((d) => d !== date) : [...s, date].sort()
     );
 
-  const canSubmit = !!empId && selected.length > 0 && hours > 0;
+  // No permitir enviar si la proyección mensual excede el límite (aviso rojo).
+  const canSubmit =
+    !!empId && selected.length > 0 && hours > 0 && (!warning || warning.tone !== "red");
 
   return (
     <form action={solicitarAutorizacion} className="space-y-4">
@@ -101,7 +103,9 @@ export function AuthRequestForm({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="text-sm">
-          <span className="mb-1 block text-slate-600">Empleado</span>
+          <span id="emp-label" className="mb-1 block text-slate-600">
+            Empleado
+          </span>
           {emp ? (
             <div className="flex items-center justify-between rounded-lg border border-brand/40 bg-brand-tint px-3 py-2">
               <span className="font-medium text-brand-dark">
@@ -116,7 +120,7 @@ export function AuthRequestForm({
                   setEmpId("");
                   setEmpQuery("");
                 }}
-                className="text-xs text-brand hover:text-brand-dark"
+                className="text-xs font-medium text-brand-dark underline hover:no-underline"
               >
                 cambiar
               </button>
@@ -130,11 +134,21 @@ export function AuthRequestForm({
                 placeholder="Escriba nombre, área o dirección…"
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 autoComplete="off"
+                role="combobox"
+                aria-labelledby="emp-label"
+                aria-autocomplete="list"
+                aria-controls="emp-matches"
+                aria-expanded={matches.length > 0}
               />
               {matches.length > 0 && (
-                <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                <ul
+                  id="emp-matches"
+                  role="listbox"
+                  aria-label="Empleados coincidentes"
+                  className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg"
+                >
                   {matches.map((m) => (
-                    <li key={m.id}>
+                    <li key={m.id} role="option" aria-selected={false}>
                       <button
                         type="button"
                         onClick={() => {

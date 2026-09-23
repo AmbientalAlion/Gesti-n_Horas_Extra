@@ -83,6 +83,18 @@ export default async function AutorizacionesPage() {
   const canRequest = profile.role === "jefe" || profile.role === "rrhh";
   const canDecide = profile.role === "rrhh" || profile.role === "director";
 
+  // Horas pendientes ("solicitada") agregadas por empleado, para que la alerta
+  // del tope mensual sume todos los días de una misma solicitud (no solo uno).
+  const pendingByEmp = new Map<string, number>();
+  for (const r of auths) {
+    if (r.status === "solicitada") {
+      pendingByEmp.set(
+        r.employee_id,
+        (pendingByEmp.get(r.employee_id) ?? 0) + Number(r.hours)
+      );
+    }
+  }
+
   return (
     <div className="space-y-6">
       <header>
@@ -120,12 +132,18 @@ export default async function AutorizacionesPage() {
             {auths.map((r) => {
               const st = STATUS_LABEL[r.status] ?? STATUS_LABEL.solicitada;
               const monthly = monthlyByEmp.get(r.employee_id) ?? 0;
-              const projected = monthly + Number(r.hours);
+              // Para solicitudes pendientes proyecta el agregado de todos sus
+              // días; para decididas, solo el de la fila (informativo).
+              const added =
+                r.status === "solicitada"
+                  ? pendingByEmp.get(r.employee_id) ?? Number(r.hours)
+                  : Number(r.hours);
+              const projected = monthly + added;
               const flag =
                 projected > RULES.MONTHLY_OVERTIME_LIMIT
-                  ? { cls: "text-status-red", text: `⛔ superaría 48h (≈${projected.toFixed(0)}h)` }
+                  ? { cls: "text-status-red", text: `⛔ superaría 48h (≈${projected.toFixed(0)}h en el mes)` }
                   : projected >= RULES.MONTHLY_OVERTIME_WARNING
-                    ? { cls: "text-status-yellow", text: `⚠ cerca del límite (≈${projected.toFixed(0)}h)` }
+                    ? { cls: "text-status-yellow", text: `⚠ cerca del límite (≈${projected.toFixed(0)}h en el mes)` }
                     : null;
               return (
                 <div key={r.id} className="card">

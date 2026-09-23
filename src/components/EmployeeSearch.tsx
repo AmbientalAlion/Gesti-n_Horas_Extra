@@ -87,8 +87,20 @@ export function EmployeeSearch({
           placeholder="Buscar empleado por nombre, ID, área, dirección, planta o jefe…"
           className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
           autoComplete="off"
+          role="combobox"
+          aria-label="Buscar empleado"
+          aria-autocomplete="list"
+          aria-controls="employee-search-listbox"
+          aria-expanded={open && !!q.trim() && results.length > 0}
+          aria-activedescendant={
+            open && results[active] ? `emp-opt-${results[active].id}` : undefined
+          }
         />
       </div>
+
+      <span className="sr-only" role="status" aria-live="polite">
+        {q.trim() ? `${results.length} coincidencias` : ""}
+      </span>
 
       {open && q.trim() && (
         <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
@@ -97,11 +109,17 @@ export function EmployeeSearch({
               Sin coincidencias para “{q.trim()}”.
             </div>
           ) : (
-            <ul className="max-h-80 overflow-auto">
+            <ul
+              id="employee-search-listbox"
+              role="listbox"
+              aria-label="Empleados coincidentes"
+              className="max-h-80 overflow-auto"
+            >
               {results.map((r, i) => (
-                <li key={r.id}>
+                <li key={r.id} id={`emp-opt-${r.id}`} role="option" aria-selected={i === active}>
                   <Link
                     href={link(r.id)}
+                    tabIndex={-1}
                     onClick={() => setOpen(false)}
                     onMouseEnter={() => setActive(i)}
                     className={clsx(

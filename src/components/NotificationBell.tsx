@@ -89,7 +89,7 @@ export function NotificationBell({
 
           {count === 0 ? (
             <div className="px-4 py-6 text-center text-sm text-slate-400">
-              No hay solicitudes por aprobar. 👍
+              No hay solicitudes pendientes por aprobar.
             </div>
           ) : (
             <ul className="max-h-72 divide-y divide-slate-100 overflow-auto">
@@ -104,7 +104,7 @@ export function NotificationBell({
                       <span className="truncate text-sm font-medium text-slate-900">
                         {it.employeeName}
                       </span>
-                      <span className="shrink-0 text-xs font-semibold text-brand">
+                      <span className="shrink-0 text-xs font-semibold text-brand-dark">
                         {it.hours.toFixed(1)}h
                       </span>
                     </div>
@@ -122,7 +122,7 @@ export function NotificationBell({
             href={href}
             onClick={() => setOpen(false)}
             className={clsx(
-              "block border-t border-slate-100 px-4 py-2.5 text-center text-sm font-medium text-brand transition hover:bg-brand-tint"
+              "block border-t border-slate-100 px-4 py-2.5 text-center text-sm font-semibold text-brand-dark transition hover:bg-brand-tint"
             )}
           >
             Ver todas las autorizaciones →

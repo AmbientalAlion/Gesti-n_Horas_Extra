@@ -262,7 +262,7 @@ export function DashboardView({
           </h2>
           {atRisk.length === 0 ? (
             <p className="py-4 text-center text-sm text-slate-400">
-              Nadie proyecta superar el límite mensual. 👍
+              Ningún empleado proyecta superar el límite mensual.
             </p>
           ) : (
             <ul className="divide-y divide-slate-100 text-sm">
