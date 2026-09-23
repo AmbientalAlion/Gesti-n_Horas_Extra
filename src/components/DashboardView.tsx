@@ -197,11 +197,11 @@ export function DashboardView({
 
         <div className="card">
           <h2 className="mb-4 text-sm font-semibold text-brand-dark">
-            Horas extra por centro de costo
+            Horas extra por dirección
           </h2>
           <HBarChart
             color="#003865"
-            items={charts.byCostCenter.slice(0, 10).map((g) => ({
+            items={charts.byDireccion.map((g) => ({
               label: g.label,
               value: g.overtime,
               sublabel: `${g.count} pers.${g.red ? ` · ${g.red} crítico` : ""}`,

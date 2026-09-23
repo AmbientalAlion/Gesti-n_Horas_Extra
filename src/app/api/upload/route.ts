@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     // 1. Empleados (por cédula) con jefe (texto) y área.
     const empByCode = new Map<
       string,
-      { code: string; name: string | null; area: string | null; cost_center: string | null; plant: string | null; manager_name: string | null }
+      { code: string; name: string | null; area: string | null; direccion: string | null; cost_center: string | null; plant: string | null; manager_name: string | null }
     >();
     for (const r of rows) {
       if (!empByCode.has(r.code)) {
@@ -96,6 +96,7 @@ export async function POST(request: Request) {
           code: r.code,
           name: r.name ?? null,
           area: r.area ?? null,
+          direccion: r.direccion ?? null,
           cost_center: r.costCenter ?? null,
           plant: r.plant ?? null,
           manager_name: r.managerName ?? null,

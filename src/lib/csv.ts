@@ -201,6 +201,7 @@ export interface OvertimeWeekly {
   code: string;
   name?: string;
   area?: string;
+  direccion?: string;
   costCenter?: string;
   plant?: string;
   managerName?: string;
@@ -255,6 +256,13 @@ const COL = {
   division: 24,
 } as const;
 
+/** Área = texto tras el primer guion del centro de costo (CeCo). */
+export function areaFromCeco(ceco: string): string {
+  const s = String(ceco ?? "").trim();
+  const dash = s.indexOf("-");
+  return (dash >= 0 ? s.slice(dash + 1) : s).trim();
+}
+
 function parseIdFecha(v: string): Date | null {
   const s = String(v ?? "").trim();
   if (/^\d{8}$/.test(s)) {
@@ -301,11 +309,13 @@ export function parseOvertimeEventsCsv(content: string): {
     const key = `${code}|${year}|${week}`;
     let rec = map.get(key);
     if (!rec) {
+      const ceco = String(cols[COL.ceco] ?? "").trim();
       rec = {
         code,
         name: String(cols[COL.nombre] ?? "").trim() || undefined,
-        area: String(cols[COL.direccion] ?? "").trim() || undefined,
-        costCenter: String(cols[COL.ceco] ?? "").trim() || undefined,
+        area: areaFromCeco(ceco) || undefined,
+        direccion: String(cols[COL.direccion] ?? "").trim() || undefined,
+        costCenter: ceco || undefined,
         plant: String(cols[COL.division] ?? "").trim() || undefined,
         managerName: String(cols[COL.jefe] ?? "").trim() || undefined,
         year,

@@ -15,7 +15,10 @@ export interface EmployeeInput {
   id: string;
   code: string;
   name?: string;
+  /** Área = texto tras el guion del centro de costo (p. ej. "GESTIÓN MANTENIMIENTO"). */
   area?: string;
+  /** Dirección = CONCRETOS / DIRECCIÓN INDUSTRIAL / DIRECCIÓN COMERCIAL. */
+  direccion?: string;
   costCenter?: string;
   plant?: string;
   roleTitle?: string;
@@ -43,13 +46,17 @@ export interface EmployeeStatus extends EmployeeInput {
 
 export interface Filters {
   plant?: string;
+  direccion?: string;
   area?: string;
+  costCenter?: string;
   manager?: string;
 }
 
 export interface FilterOptions {
   plants: string[];
+  directions: string[];
   areas: string[];
+  costCenters: string[];
   managers: string[];
 }
 
@@ -61,19 +68,23 @@ export function buildFilterOptions(employees: EmployeeInput[]): FilterOptions {
     );
   return {
     plants: uniq(employees.map((e) => e.plant)),
+    directions: uniq(employees.map((e) => e.direccion)),
     areas: uniq(employees.map((e) => e.area)),
+    costCenters: uniq(employees.map((e) => e.costCenter)),
     managers: uniq(employees.map((e) => e.managerName)),
   };
 }
 
-/** Aplica los filtros (planta/área/jefe) a la lista de empleados. */
+/** Aplica los filtros (planta/dirección/área/centro de costo/jefe). */
 export function applyFilters<T extends EmployeeInput>(
   employees: T[],
   filters: Filters
 ): T[] {
   return employees.filter((e) => {
     if (filters.plant && (e.plant ?? "") !== filters.plant) return false;
+    if (filters.direccion && (e.direccion ?? "") !== filters.direccion) return false;
     if (filters.area && (e.area ?? "") !== filters.area) return false;
+    if (filters.costCenter && (e.costCenter ?? "") !== filters.costCenter) return false;
     if (filters.manager && (e.managerName ?? "") !== filters.manager) return false;
     return true;
   });
@@ -245,6 +256,7 @@ export function buildEmployeeDetail(
       code: status.code,
       name: status.name,
       area: status.area,
+      direccion: status.direccion,
       costCenter: status.costCenter,
       plant: status.plant,
       roleTitle: status.roleTitle,
@@ -420,7 +432,7 @@ export interface Reincidente {
 
 export interface DashboardCharts {
   byArea: AreaOvertime[];
-  byCostCenter: GroupOvertime[];
+  byDireccion: GroupOvertime[];
   byPlant: GroupOvertime[];
   weeklyTrend: WeeklyTrendPoint[];
   topEmployees: TopEmployee[];
@@ -459,7 +471,7 @@ export function computeDashboardCharts(
     }
     return [...m.values()].sort((a, b) => b.overtime - a.overtime);
   };
-  const byCostCenter = groupBy((s) => s.costCenter ?? "");
+  const byDireccion = groupBy((s) => s.direccion ?? "");
   const byPlant = groupBy((s) => s.plant ?? "");
 
   // Tendencia semanal de horas extra (semanas del mes en curso).
@@ -532,7 +544,7 @@ export function computeDashboardCharts(
     })
     .sort((a, b) => b.weeksHigh - a.weeksHigh);
 
-  return { byArea, byCostCenter, byPlant, weeklyTrend, topEmployees, heatmap, reincidentes };
+  return { byArea, byDireccion, byPlant, weeklyTrend, topEmployees, heatmap, reincidentes };
 }
 
 function groupBy<T, K>(items: T[], key: (item: T) => K): Map<K, T[]> {

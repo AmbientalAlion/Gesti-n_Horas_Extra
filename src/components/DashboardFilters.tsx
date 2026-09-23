@@ -3,6 +3,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import type { FilterOptions, Filters } from "@/lib/aggregate";
 
+const KEYS = ["planta", "direccion", "area", "ceco", "jefe"];
+
 export function DashboardFilters({
   options,
   current,
@@ -22,11 +24,17 @@ export function DashboardFilters({
 
   const clearAll = () => {
     const next = new URLSearchParams(params.toString());
-    ["planta", "area", "jefe"].forEach((k) => next.delete(k));
+    KEYS.forEach((k) => next.delete(k));
     router.push(`?${next.toString()}`);
   };
 
-  const active = !!(current.plant || current.area || current.manager);
+  const active = !!(
+    current.plant ||
+    current.direccion ||
+    current.area ||
+    current.costCenter ||
+    current.manager
+  );
 
   const select = (
     label: string,
@@ -53,9 +61,11 @@ export function DashboardFilters({
 
   return (
     <div className="card print:hidden">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {select("Planta / sede", "planta", current.plant, options.plants)}
+        {select("Dirección", "direccion", current.direccion, options.directions)}
         {select("Área", "area", current.area, options.areas)}
+        {select("Centro de costo", "ceco", current.costCenter, options.costCenters)}
         {select("Jefe / supervisor", "jefe", current.manager, options.managers)}
       </div>
       {active && (

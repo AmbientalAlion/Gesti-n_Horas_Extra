@@ -99,7 +99,7 @@ export async function getDashboardData(
   const { data: employeesRaw } = await supabase
     .from("employees")
     .select(
-      "id, code, name, role_title, area, cost_center, plant, manager_id, manager_name, profiles:manager_id (full_name)"
+      "id, code, name, role_title, area, direccion, cost_center, plant, manager_id, manager_name, profiles:manager_id (full_name)"
     )
     .eq("active", true);
 
@@ -108,6 +108,7 @@ export async function getDashboardData(
     code: e.code,
     name: e.name ?? undefined,
     area: e.area ?? undefined,
+    direccion: e.direccion ?? undefined,
     costCenter: e.cost_center ?? undefined,
     plant: e.plant ?? undefined,
     roleTitle: e.role_title ?? undefined,

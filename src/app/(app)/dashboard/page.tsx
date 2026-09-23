@@ -13,7 +13,9 @@ export default async function DashboardPage({
     mes?: string;
     anio?: string;
     planta?: string;
+    direccion?: string;
     area?: string;
+    ceco?: string;
     jefe?: string;
   };
 }) {
@@ -24,7 +26,9 @@ export default async function DashboardPage({
 
   const filters: Filters = {
     plant: searchParams.planta || undefined,
+    direccion: searchParams.direccion || undefined,
     area: searchParams.area || undefined,
+    costCenter: searchParams.ceco || undefined,
     manager: searchParams.jefe || undefined,
   };
 

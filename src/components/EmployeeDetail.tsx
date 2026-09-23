@@ -53,6 +53,11 @@ export function EmployeeDetailView({
               {MONTHS[d.period.month - 1]} {d.period.year} (semana {d.period.week})
             </p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              {d.employee.direccion && (
+                <span className="rounded-full bg-brand-tint px-3 py-1 text-brand-dark">
+                  Dirección: <strong>{d.employee.direccion}</strong>
+                </span>
+              )}
               <span className="rounded-full bg-brand-tint px-3 py-1 text-brand-dark">
                 Área: <strong>{d.employee.area ?? "—"}</strong>
               </span>

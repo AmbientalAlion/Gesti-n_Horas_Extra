@@ -15,7 +15,14 @@ const ROLE_LABEL: Record<Role, string> = {
 export default function DemoDashboard({
   searchParams,
 }: {
-  searchParams: { rol?: string; planta?: string; area?: string; jefe?: string };
+  searchParams: {
+    rol?: string;
+    planta?: string;
+    direccion?: string;
+    area?: string;
+    ceco?: string;
+    jefe?: string;
+  };
 }) {
   const role = (["rrhh", "director", "jefe"].includes(searchParams.rol ?? "")
     ? searchParams.rol
@@ -23,7 +30,9 @@ export default function DemoDashboard({
 
   const filters: Filters = {
     plant: searchParams.planta || undefined,
+    direccion: searchParams.direccion || undefined,
     area: searchParams.area || undefined,
+    costCenter: searchParams.ceco || undefined,
     manager: searchParams.jefe || undefined,
   };
 
