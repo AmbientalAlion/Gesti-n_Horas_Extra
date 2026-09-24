@@ -1,7 +1,9 @@
 "use client";
 
+import { useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import clsx from "clsx";
 import type { SemaphoreLevel } from "@/lib/types";
 
 // Barras horizontales para magnitud (un solo tono: Azul ALIÓN). Etiqueta directa
@@ -36,9 +38,10 @@ export function HBarChart({
 }) {
   const router = useRouter();
   const params = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
   if (items.length === 0) {
-    return <p className="py-6 text-center text-sm text-slate-400">Sin datos.</p>;
+    return <p className="py-6 text-center text-sm text-slate-500">Sin datos.</p>;
   }
   const max = Math.max(...items.map((i) => i.value), 1);
 
@@ -47,11 +50,14 @@ export function HBarChart({
     const next = new URLSearchParams(params.toString());
     next.set(drill.param, label);
     for (const c of drill.clear ?? []) next.delete(c);
-    router.push(`?${next.toString()}`);
+    startTransition(() => router.push(`?${next.toString()}`, { scroll: false }));
   };
 
   return (
-    <ul className="space-y-3.5">
+    <ul
+      className={clsx("space-y-3.5 transition-opacity", isPending && "opacity-60")}
+      aria-busy={isPending}
+    >
       {items.map((it) => {
         const pct = Math.max(2, (it.value / max) * 100);
         const clickable = !!it.href || !!drill;
@@ -89,7 +95,7 @@ export function HBarChart({
         );
 
         const sub = it.sublabel ? (
-          <div className="mb-1.5 truncate text-xs text-slate-400" title={it.sublabel}>
+          <div className="mb-1.5 truncate text-xs text-slate-500" title={it.sublabel}>
             {it.sublabel}
           </div>
         ) : null;

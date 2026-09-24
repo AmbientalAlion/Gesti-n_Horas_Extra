@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { WeekDayPicker, type WeekDayOpt } from "./WeekDayPicker";
+import { SubmitButton } from "./SubmitButton";
 import { solicitarAutorizacion } from "@/app/(app)/autorizaciones/actions";
 
 const MONTHLY_LIMIT = 48;
@@ -132,7 +133,7 @@ export function AuthRequestForm({
                 value={empQuery}
                 onChange={(e) => setEmpQuery(e.target.value)}
                 placeholder="Escriba nombre, área o dirección…"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="field"
                 autoComplete="off"
                 role="combobox"
                 aria-labelledby="emp-label"
@@ -186,7 +187,7 @@ export function AuthRequestForm({
             onChange={(e) =>
               setHours(Math.min(MAX_HOURS, Math.max(0, Number(e.target.value))))
             }
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            className="field"
             required
           />
         </label>
@@ -195,7 +196,7 @@ export function AuthRequestForm({
       <input
         name="reason"
         placeholder="Motivo (opcional)"
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        className="field"
       />
 
       {selected.length > 0 && emp && (
@@ -218,9 +219,11 @@ export function AuthRequestForm({
         </div>
       )}
 
-      <button className="btn-primary text-sm disabled:opacity-50" type="submit" disabled={!canSubmit}>
-        Solicitar autorización
-      </button>
+      <SubmitButton
+        label="Solicitar autorización"
+        pendingLabel="Enviando solicitud…"
+        disabled={!canSubmit}
+      />
     </form>
   );
 }

@@ -36,6 +36,14 @@ export default function DemoDashboard({
     manager: searchParams.jefe || undefined,
   };
 
+  // Filtros vigentes (sin `rol`, que se añade aparte) para conservar el
+  // contexto al abrir y cerrar una ficha.
+  const query = new URLSearchParams(
+    Object.entries(searchParams).filter(
+      ([k, v]) => v && k !== "rol"
+    ) as [string, string][]
+  ).toString();
+
   const { statuses, summary, charts, period, filterOptions } = demoDashboard(
     role,
     filters
@@ -53,6 +61,7 @@ export default function DemoDashboard({
       role={role}
       filterOptions={filterOptions}
       filters={filters}
+      query={query}
       toolbar={<PrintButton />}
     />
   );

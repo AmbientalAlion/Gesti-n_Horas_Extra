@@ -15,7 +15,7 @@ const MONTHS = [
 const TREND: Record<Detail["trend"], { icon: string; label: string; cls: string }> = {
   up: { icon: "▲", label: "más que la semana previa", cls: "text-status-red" },
   down: { icon: "▼", label: "menos que la semana previa", cls: "text-status-green" },
-  flat: { icon: "▬", label: "sin cambio", cls: "text-slate-400" },
+  flat: { icon: "▬", label: "sin cambio", cls: "text-slate-500" },
 };
 
 export function EmployeeDetailView({
@@ -99,7 +99,7 @@ export function EmployeeDetailView({
               warning={RULES.MONTHLY_OVERTIME_WARNING}
             />
           </div>
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="mt-2 text-xs text-slate-500">
             Este es el límite que no puede superarse.
           </p>
         </div>
@@ -114,32 +114,41 @@ export function EmployeeDetailView({
               warning={RULES.WEEKLY_OVERTIME_WARNING}
             />
           </div>
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="mt-2 text-xs text-slate-500">
             Superar 12h en una semana está permitido; es solo informativo.
           </p>
         </div>
       </section>
 
       {/* Métricas del mes */}
-      <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Metric label="Extra del mes" value={`${d.extraHoursMonth.toFixed(1)}h`} />
-        <Metric label="Horas base del mes" value={`${d.baseHoursMonth.toFixed(1)}h`} />
-        <Metric label="Total trabajado (mes)" value={`${d.totalHoursMonth.toFixed(1)}h`} />
-        <Metric
-          label="Promedio extra/semana"
-          value={`${d.avgWeeklyOvertime.toFixed(1)}h`}
-          hint={`${d.weeksWorkedMonth} semanas`}
-        />
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-brand-dark">
+          Lo que lleva del mes
+        </h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+          <Metric label="Extra del mes" value={`${d.extraHoursMonth.toFixed(1)}h`} />
+          <Metric label="Horas base" value={`${d.baseHoursMonth.toFixed(1)}h`} />
+          <Metric label="Total trabajado" value={`${d.totalHoursMonth.toFixed(1)}h`} />
+          <Metric
+            label="Promedio semanal"
+            value={`${d.avgWeeklyOvertime.toFixed(1)}h`}
+            hint={`${d.weeksWorkedMonth} semanas`}
+          />
+        </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-brand-dark">
+          Cómo va a cerrar el mes
+        </h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
         <div className="card">
           <p className="text-sm text-slate-500">Tendencia semanal</p>
           <p className={clsx("mt-1 text-lg font-semibold", trend.cls)}>
             {trend.icon} {d.trendDelta > 0 ? "+" : ""}
             {d.trendDelta.toFixed(1)}h
           </p>
-          <p className="text-xs text-slate-400">{trend.label}</p>
+          <p className="text-xs text-slate-500">{trend.label}</p>
         </div>
         <div className="card">
           <p className="text-sm text-slate-500">Proyección de cierre de mes</p>
@@ -151,7 +160,7 @@ export function EmployeeDetailView({
           >
             ≈ {d.projectedMonthlyOvertime.toFixed(1)}h
           </p>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             {d.willExceedMonthly ? "Superaría las 48h del mes" : "Dentro del límite mensual"}
           </p>
         </div>
@@ -161,7 +170,7 @@ export function EmployeeDetailView({
             <p className="mt-1 text-lg font-semibold text-brand-dark">
               #{d.areaRankPosition} de {d.areaRankTotal}
             </p>
-            <p className="text-xs text-slate-400">por horas extra del mes</p>
+            <p className="text-xs text-slate-500">por horas extra del mes</p>
           </div>
         )}
         <div className="card">
@@ -182,9 +191,10 @@ export function EmployeeDetailView({
                 ? "En riesgo"
                 : "En regla"}
           </p>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             {d.frozenCount > 0 ? `${d.frozenCount} registro(s) por revisar` : "Sin novedades"}
           </p>
+        </div>
         </div>
       </section>
 
@@ -200,7 +210,7 @@ export function EmployeeDetailView({
             <Metric label="Dominical diurna" value={`${d.recargos.dom_diurna.toFixed(1)}h`} />
             <Metric label="Dominical nocturna" value={`${d.recargos.dom_nocturna.toFixed(1)}h`} />
           </div>
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="mt-2 text-xs text-slate-500">
             Clasificación según el archivo de novedades. Base para el cálculo de
             recargos de ley (25% / 75% / dominical).
           </p>
@@ -228,7 +238,7 @@ export function EmployeeDetailView({
             <tbody className="divide-y divide-slate-100">
               {d.history.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-slate-400">
+                  <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
                     Sin registros cargados.
                   </td>
                 </tr>
@@ -281,7 +291,7 @@ export function EmployeeDetailView({
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-xs text-slate-400">
+        <p className="mt-2 text-xs text-slate-500">
           Los datos del archivo biométrico son semanales (no hay marcación diaria).
           La franja diaria y el desglose diurno/nocturno permitirían mayor detalle.
         </p>
@@ -301,9 +311,9 @@ function Metric({
 }) {
   return (
     <div className="card">
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-brand-dark">{value}</p>
-      {hint && <p className="text-xs text-slate-400">{hint}</p>}
+      <p className="min-h-[2.5rem] text-[13px] leading-snug text-slate-600">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums text-brand-dark">{value}</p>
+      {hint && <p className="text-xs text-slate-500">{hint}</p>}
     </div>
   );
 }

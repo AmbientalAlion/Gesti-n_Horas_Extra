@@ -31,7 +31,7 @@ export function CollapsibleCard({
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-controls={panelId}
-        className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-brand-tint/60"
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-brand-tint/60 sm:px-5 sm:py-4"
       >
         <span
           className={clsx(
@@ -47,7 +47,9 @@ export function CollapsibleCard({
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-brand-dark">{title}</span>
           {subtitle && (
-            <span className="mt-0.5 block text-xs text-slate-500">{subtitle}</span>
+            <span className="mt-0.5 block max-w-[60ch] text-[13px] leading-snug text-slate-600">
+              {subtitle}
+            </span>
           )}
         </span>
         {badge && <span className="shrink-0">{badge}</span>}
@@ -55,7 +57,7 @@ export function CollapsibleCard({
       <div
         id={panelId}
         hidden={!open}
-        className="border-t border-slate-100 px-5 py-5"
+        className="border-t border-slate-100 px-4 py-4 sm:px-5 sm:py-5"
       >
         {children}
       </div>

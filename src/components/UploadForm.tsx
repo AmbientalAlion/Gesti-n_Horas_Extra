@@ -55,7 +55,7 @@ export function UploadForm({ demo = false }: { demo?: boolean }) {
 
   async function submit() {
     if (!file) {
-      setError("Selecciona un archivo CSV.");
+      setError("Seleccione un archivo CSV.");
       return;
     }
     setLoading(true);
@@ -108,10 +108,10 @@ export function UploadForm({ demo = false }: { demo?: boolean }) {
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         />
         <p className="text-sm font-medium text-slate-700">
-          {file ? file.name : "Arrastra el CSV biométrico aquí"}
+          {file ? file.name : "Arrastre aquí el archivo del biométrico"}
         </p>
-        <p className="mt-1 text-xs text-slate-400">
-          o haz clic para seleccionar un archivo
+        <p className="mt-1 text-xs text-slate-500">
+          o pulse para seleccionarlo
         </p>
       </div>
 

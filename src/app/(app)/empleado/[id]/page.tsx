@@ -6,10 +6,23 @@ export const dynamic = "force-dynamic";
 
 export default async function EmpleadoPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams: Record<string, string | undefined>;
 }) {
   const detail = await getEmployeeDetail(params.id);
   if (!detail) notFound();
-  return <EmployeeDetailView detail={detail} backHref="/dashboard" />;
+
+  // Vuelve al panel conservando los filtros y el mes con los que se llegó.
+  const qs = new URLSearchParams(
+    Object.entries(searchParams).filter(([, v]) => v) as [string, string][]
+  ).toString();
+
+  return (
+    <EmployeeDetailView
+      detail={detail}
+      backHref={qs ? `/dashboard?${qs}` : "/dashboard"}
+    />
+  );
 }

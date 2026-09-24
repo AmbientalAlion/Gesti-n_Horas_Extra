@@ -4,7 +4,7 @@ import type { HeatmapData } from "@/lib/aggregate";
 // (Azul ALIÓN, claro→oscuro). Valor en cada celda + <title>.
 
 function shade(value: number, max: number): { bg: string; fg: string } {
-  if (max <= 0 || value <= 0) return { bg: "#f1f5f9", fg: "#94a3b8" };
+  if (max <= 0 || value <= 0) return { bg: "#f1f5f9", fg: "#64748b" };
   const t = Math.min(1, value / max);
   // Interpola de Azul 7% (#EBF7F9) a Azul ALIÓN oscuro (#036f88).
   const lerp = (a: number, b: number) => Math.round(a + (b - a) * t);
@@ -17,7 +17,7 @@ function shade(value: number, max: number): { bg: string; fg: string } {
 
 export function Heatmap({ data }: { data: HeatmapData }) {
   if (data.areas.length === 0 || data.weeks.length === 0) {
-    return <p className="py-6 text-center text-sm text-slate-400">Sin datos.</p>;
+    return <p className="py-6 text-center text-sm text-slate-500">Sin datos.</p>;
   }
 
   return (
@@ -25,9 +25,9 @@ export function Heatmap({ data }: { data: HeatmapData }) {
       <table className="w-full border-separate" style={{ borderSpacing: 3 }}>
         <thead>
           <tr>
-            <th className="p-1 text-left text-xs font-medium text-slate-400">Área</th>
+            <th className="p-1 text-left text-[13px] font-semibold text-slate-600">Área</th>
             {data.weeks.map((w) => (
-              <th key={w} className="p-1 text-center text-xs font-medium text-slate-400">
+              <th key={w} className="p-1 text-center text-[13px] font-semibold text-slate-600">
                 S{w}
               </th>
             ))}
@@ -56,7 +56,7 @@ export function Heatmap({ data }: { data: HeatmapData }) {
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-xs text-slate-400">
+      <p className="mt-2 text-xs text-slate-500">
         Horas extra por área y semana · más oscuro = más horas
       </p>
     </div>

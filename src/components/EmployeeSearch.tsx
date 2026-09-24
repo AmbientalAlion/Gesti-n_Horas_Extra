@@ -20,10 +20,13 @@ export function EmployeeSearch({
   rows,
   hrefBase,
   roleParam,
+  query,
 }: {
   rows: EmployeeStatus[];
   hrefBase: string;
   roleParam?: string;
+  /** Filtros vigentes, para volver al panel tal como estaba. */
+  query?: string;
 }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -54,14 +57,16 @@ export function EmployeeSearch({
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
 
-  const link = (id: string) =>
-    `${hrefBase}/${id}${roleParam ? `?rol=${roleParam}` : ""}`;
+  const link = (id: string) => {
+    const qs = [query, roleParam ? `rol=${roleParam}` : ""].filter(Boolean).join("&");
+    return `${hrefBase}/${id}${qs ? `?${qs}` : ""}`;
+  };
 
   return (
     <div ref={ref} className="relative">
       <div className="relative">
         <svg
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
           width="18" height="18" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
           aria-hidden="true"
@@ -105,7 +110,7 @@ export function EmployeeSearch({
       {open && q.trim() && (
         <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
           {results.length === 0 ? (
-            <div className="px-4 py-4 text-center text-sm text-slate-400">
+            <div className="px-4 py-4 text-center text-sm text-slate-500">
               Sin coincidencias para “{q.trim()}”.
             </div>
           ) : (
@@ -141,7 +146,7 @@ export function EmployeeSearch({
                       <span className="block font-semibold tabular-nums text-brand-dark">
                         {r.monthlyOvertime.toFixed(0)}h
                       </span>
-                      <span className="block text-[10px] text-slate-400">mes</span>
+                      <span className="block text-[10px] text-slate-500">mes</span>
                     </span>
                   </Link>
                 </li>

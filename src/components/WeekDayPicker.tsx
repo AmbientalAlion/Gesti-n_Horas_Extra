@@ -42,7 +42,7 @@ export function WeekDayPicker({
   const allSelected = selected.length === days.length && days.length > 0;
 
   return (
-    <div className="rounded-xl border border-brand/30 bg-brand-tint p-4">
+    <div className="rounded-xl border border-brand/30 bg-brand-tint p-3 sm:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="text-xs font-semibold text-brand-dark">
           Semana {weekNumber} · {monthLabel} {year}{" "}
@@ -53,7 +53,7 @@ export function WeekDayPicker({
             <button
               type="button"
               onClick={allSelected ? onClear : onSelectAll}
-              className="rounded-md border border-brand/40 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-dark transition hover:bg-brand hover:text-white"
+              className="inline-flex min-h-11 items-center rounded-md border border-brand/40 bg-white px-3 py-1 text-xs font-medium text-brand-dark transition hover:bg-brand hover:text-white"
             >
               {allSelected ? "Limpiar" : "Toda la semana"}
             </button>
@@ -61,7 +61,7 @@ export function WeekDayPicker({
         )}
       </div>
 
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
         {days.map((d) => {
           const sel = isSel(d.date);
           return (
@@ -72,7 +72,7 @@ export function WeekDayPicker({
               disabled={readOnly}
               onClick={() => onToggle?.(d.date)}
               className={clsx(
-                "flex flex-col items-center rounded-lg py-2 text-xs transition",
+                "flex min-h-[52px] flex-col items-center justify-center rounded-lg px-0 py-2 transition",
                 readOnly && "cursor-default",
                 sel
                   ? "bg-brand font-semibold text-white shadow-sm"
@@ -81,8 +81,8 @@ export function WeekDayPicker({
               )}
               title={d.isToday ? "Hoy" : undefined}
             >
-              <span className="opacity-70">{d.dow}</span>
-              <span className="mt-0.5 text-sm font-semibold">{d.day}</span>
+              <span className="text-xs opacity-70">{d.dow}</span>
+              <span className="mt-0.5 text-[15px] font-bold">{d.day}</span>
               {sel && <span className="mt-0.5 text-[9px] leading-none">✓</span>}
             </button>
           );

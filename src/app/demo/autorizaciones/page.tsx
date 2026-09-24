@@ -80,13 +80,13 @@ export default function DemoAutorizaciones() {
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="text-sm">
             <span className="mb-1 block text-slate-600">Empleado</span>
-            <div className="rounded-lg border border-slate-300 px-3 py-2 text-slate-400">
+            <div className="rounded-lg border border-slate-300 px-3 py-2 text-slate-500">
               Ana Restrepo — Producción Rionegro
             </div>
           </div>
           <div className="text-sm">
             <span className="mb-1 block text-slate-600">Horas por día (máximo 5)</span>
-            <div className="rounded-lg border border-slate-300 px-3 py-2 text-slate-400">3</div>
+            <div className="rounded-lg border border-slate-300 px-3 py-2 text-slate-500">3</div>
           </div>
         </div>
         <div className="rounded-lg border border-brand/30 bg-brand-tint px-3 py-2 text-sm text-brand-dark">

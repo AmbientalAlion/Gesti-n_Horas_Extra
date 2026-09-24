@@ -15,7 +15,7 @@ export function TrendChart({
   unit?: string;
 }) {
   if (points.length === 0) {
-    return <p className="py-6 text-center text-sm text-slate-400">Sin datos.</p>;
+    return <p className="py-6 text-center text-sm text-slate-500">Sin datos.</p>;
   }
 
   const W = 320;
@@ -59,11 +59,11 @@ export function TrendChart({
           x2={padL + plotW}
           y1={padT + plotH * f}
           y2={padT + plotH * f}
-          stroke="#e2e8f0"
+          className="stroke-slate-200 dark:stroke-slate-700"
           strokeWidth={1}
         />
       ))}
-      <text x={padL} y={padT - 6} className="fill-slate-400" style={{ fontSize: 9 }}>
+      <text x={padL} y={padT - 6} className="fill-slate-500" style={{ fontSize: 9 }}>
         máx {max}
         {unit}
       </text>
@@ -82,7 +82,7 @@ export function TrendChart({
 
       {points.map((p, i) => (
         <g key={i}>
-          <circle cx={x(i)} cy={y(p.value)} r={4} fill="#0098BA" stroke="#fff" strokeWidth={1.5}>
+          <circle cx={x(i)} cy={y(p.value)} r={4} fill="#0098BA" className="stroke-white dark:stroke-slate-900" strokeWidth={1.5}>
             <title>{`${p.label}: ${p.value}${unit}`}</title>
           </circle>
           <text

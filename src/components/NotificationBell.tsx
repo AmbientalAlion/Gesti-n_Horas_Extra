@@ -52,7 +52,7 @@ export function NotificationBell({
         onClick={() => setOpen((o) => !o)}
         aria-label={`Notificaciones${count ? `: ${count} pendientes` : ""}`}
         aria-expanded={open}
-        className="relative flex h-9 w-9 items-center justify-center rounded-full text-brand-dark transition hover:bg-brand-tint"
+        className="relative flex h-11 w-11 items-center justify-center rounded-full text-brand-dark transition hover:bg-brand-tint lg:h-9 lg:w-9"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -88,7 +88,7 @@ export function NotificationBell({
           </div>
 
           {count === 0 ? (
-            <div className="px-4 py-6 text-center text-sm text-slate-400">
+            <div className="px-4 py-6 text-center text-sm text-slate-500">
               No hay solicitudes pendientes por aprobar.
             </div>
           ) : (

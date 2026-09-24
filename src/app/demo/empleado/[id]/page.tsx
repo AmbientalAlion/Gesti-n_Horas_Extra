@@ -10,7 +10,7 @@ export default function DemoEmpleadoPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { rol?: string };
+  searchParams: Record<string, string | undefined>;
 }) {
   const role = (["rrhh", "director", "jefe"].includes(searchParams.rol ?? "")
     ? searchParams.rol
@@ -18,7 +18,16 @@ export default function DemoEmpleadoPage({
 
   const detail = demoEmployeeDetail(params.id, role);
   if (!detail) notFound();
+
+  // Conserva los filtros con los que se llegó (y el rol de la demostración).
+  const qs = new URLSearchParams(
+    Object.entries({ ...searchParams, rol: role }).filter(([, v]) => v) as [
+      string,
+      string,
+    ][]
+  ).toString();
+
   return (
-    <EmployeeDetailView detail={detail} backHref={`/demo/dashboard?rol=${role}`} />
+    <EmployeeDetailView detail={detail} backHref={`/demo/dashboard?${qs}`} />
   );
 }

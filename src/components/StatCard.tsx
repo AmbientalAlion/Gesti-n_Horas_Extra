@@ -21,7 +21,7 @@ export function StatCard({ label, value, hint, tone = "default" }: StatCardProps
       <p className={clsx("mt-1 text-2xl font-semibold leading-tight sm:text-3xl", TONES[tone])}>
         {value}
       </p>
-      {hint && <p className="mt-auto pt-1 text-xs text-slate-400">{hint}</p>}
+      {hint && <p className="mt-auto pt-1 text-xs text-slate-500">{hint}</p>}
     </div>
   );
 }

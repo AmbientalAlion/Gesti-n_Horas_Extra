@@ -11,6 +11,19 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: "Mulish", "Muli", Arial, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* En teléfono los campos van a 16px: por debajo de eso Safari hace zoom
+   automático al enfocarlos y deja la página desplazada de lado. */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+    min-height: 44px;
+  }
 }
 
 /* ---------- Modo oscuro ---------- */
@@ -42,6 +55,9 @@ body {
 .dark .text-slate-900 {
   color: #e2e8f0 !important;
 }
+.dark .text-slate-800 {
+  color: #dbe3ee !important;
+}
 .dark .text-slate-700 {
   color: #cbd5e1 !important;
 }
@@ -49,10 +65,10 @@ body {
   color: #b6c2d4 !important;
 }
 .dark .text-slate-500 {
-  color: #94a3b8 !important;
+  color: #a3b0c2 !important;
 }
 .dark .text-slate-400 {
-  color: #7c8aa0 !important;
+  color: #9aa8bd !important;
 }
 .dark .text-brand-dark {
   color: #7fd0e3 !important;
@@ -78,6 +94,92 @@ body {
   border-color: #334155;
 }
 
+/* Estados interactivos en oscuro: sin esto, al pasar el mouse el fondo se
+   aclaraba y el texto quedaba ilegible. */
+.dark .hover\:bg-brand-tint:hover,
+.dark .hover\:bg-brand-tint\/60:hover,
+.dark .hover\:bg-brand\/10:hover {
+  background-color: #16304d !important;
+}
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-100:hover {
+  background-color: #1c2740 !important;
+}
+.dark .hover\:bg-brand:hover {
+  background-color: #0098ba !important;
+}
+.dark .hover\:text-brand-dark:hover {
+  color: #a5e3f2 !important;
+}
+.dark .hover\:text-slate-700:hover {
+  color: #e2e8f0 !important;
+}
+
+/* Texto dentro de los SVG de las gráficas. */
+.dark .fill-brand-dark {
+  fill: #7fd0e3 !important;
+}
+.dark .fill-slate-500 {
+  fill: #a3b0c2 !important;
+}
+.dark .fill-slate-400 {
+  fill: #9aa8bd !important;
+}
+
+/* Avisos (ámbar / rojo / verde) en oscuro. */
+.dark .bg-amber-50 {
+  background-color: #2a2009 !important;
+}
+.dark .bg-amber-100 {
+  background-color: #3a2c0c !important;
+}
+.dark .text-amber-800,
+.dark .text-amber-700,
+.dark .text-amber-600 {
+  color: #fcd34d !important;
+}
+.dark .border-amber-200 {
+  border-color: #5a4410 !important;
+}
+.dark .bg-red-50 {
+  background-color: #2c1414 !important;
+}
+.dark .bg-red-100 {
+  background-color: #3a1a1a !important;
+}
+.dark .text-red-800,
+.dark .text-red-700 {
+  color: #fca5a5 !important;
+}
+.dark .border-red-200 {
+  border-color: #5f2020 !important;
+}
+.dark .bg-green-50 {
+  background-color: #0f2b1c !important;
+}
+.dark .bg-green-100 {
+  background-color: #0f2b1c !important;
+}
+.dark .text-green-800,
+.dark .text-green-700 {
+  color: #86efac !important;
+}
+.dark .border-green-200 {
+  border-color: #1e5b3a !important;
+}
+/* `.dark .card` gana por especificidad a `.bg-red-50`: hay que reponerlo. */
+.dark .card.bg-red-50 {
+  background-color: #2c1414 !important;
+  border-color: #5f2020 !important;
+}
+.dark .card.bg-amber-50 {
+  background-color: #2a2009 !important;
+  border-color: #5a4410 !important;
+}
+.dark .focus\:ring-brand\/20:focus {
+  --tw-ring-color: rgba(0, 152, 186, 0.55) !important;
+}
+
 @media print {
   body {
     background: #fff;
@@ -93,12 +195,26 @@ body {
 
 @layer components {
   .card {
-    @apply rounded-xl border border-slate-200 bg-white p-5 shadow-sm;
+    @apply rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-dark disabled:opacity-50;
+    @apply inline-flex min-h-11 items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-dark disabled:opacity-50;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50;
+    @apply inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50;
+  }
+  /* Encabezado de tabla legible: en español completo, sin versalitas apretadas. */
+  .th {
+    @apply whitespace-nowrap px-4 py-3 text-left text-[13px] font-semibold text-slate-600;
+  }
+  .th-num {
+    @apply whitespace-nowrap px-4 py-3 text-right text-[13px] font-semibold text-slate-600;
+  }
+  /* Campo de formulario estándar (altura cómoda y foco visible). */
+  .field {
+    @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-500 focus:border-brand focus:ring-2 focus:ring-brand/30;
+  }
+  .label-field {
+    @apply mb-1.5 block text-[13px] font-medium text-slate-600;
   }
 }

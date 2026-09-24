@@ -24,18 +24,34 @@ export function BudgetBar({
       ? "bg-status-yellow"
       : "bg-status-green";
   const available = Math.max(0, limit - used);
+  const excess = Math.max(0, used - limit);
 
   return (
     <div>
-      <div className="flex items-end justify-between">
-        <span className="text-2xl font-semibold tabular-nums text-brand-dark">
-          {available.toFixed(1)}
-          {unit}
-        </span>
-        <span className="text-xs text-slate-500">
-          disponibles de {limit}
-          {unit}
-        </span>
+      <div className="flex items-end justify-between gap-2">
+        {over ? (
+          <>
+            <span className="text-2xl font-semibold tabular-nums text-status-red">
+              +{excess.toFixed(1)}
+              {unit}
+            </span>
+            <span className="text-xs font-medium text-status-red">
+              por encima del límite de {limit}
+              {unit}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="text-2xl font-semibold tabular-nums text-brand-dark">
+              {available.toFixed(1)}
+              {unit}
+            </span>
+            <span className="text-xs text-slate-500">
+              disponibles de {limit}
+              {unit}
+            </span>
+          </>
+        )}
       </div>
       <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
         <div

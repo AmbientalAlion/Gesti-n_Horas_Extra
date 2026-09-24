@@ -5,6 +5,7 @@ import { decidirAutorizacion } from "./actions";
 import { AuthRequestForm, type AuthEmployee } from "@/components/AuthRequestForm";
 import type { WeekDayOpt } from "@/components/WeekDayPicker";
 import { RULES } from "@/lib/overtime";
+import { PageHeader } from "@/components/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -97,16 +98,10 @@ export default async function AutorizacionesPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-brand-dark">
-          Autorización previa de horas extra
-        </h1>
-        <p className="text-sm text-slate-500">
-          El jefe selecciona los días de la semana en curso (máximo{" "}
-          {RULES.MAX_AUTHORIZATION_HOURS}h por día); el Director de planta o RRHH
-          aprueban o rechazan.
-        </p>
-      </header>
+      <PageHeader
+        title="Autorización previa de horas extra"
+        subtitle={`El jefe selecciona los días de la semana en curso (máximo ${RULES.MAX_AUTHORIZATION_HOURS} horas por día) y el Director de planta o Recursos Humanos aprueban o rechazan. Si la solicitud acerca o pasa el límite mensual de 48 horas, se avisa antes de enviarla.`}
+      />
 
       {canRequest && (
         <section className="card">
@@ -163,7 +158,7 @@ export default async function AutorizacionesPage() {
                         <div className={`mt-1 text-xs font-medium ${flag.cls}`}>{flag.text}</div>
                       )}
                       {r.decided_at && (
-                        <div className="mt-1 text-xs text-slate-400">
+                        <div className="mt-1 text-xs text-slate-500">
                           Decisión registrada{r.decision_note ? `: ${r.decision_note}` : ""}
                         </div>
                       )}
@@ -175,10 +170,14 @@ export default async function AutorizacionesPage() {
                     <div className="mt-3">
                       <form action={decidirAutorizacion} className="flex flex-wrap items-center gap-2">
                         <input type="hidden" name="id" value={r.id} />
+                        <label className="sr-only" htmlFor={`nota-${r.id}`}>
+                          Nota de decisión
+                        </label>
                         <input
+                          id={`nota-${r.id}`}
                           name="note"
-                          placeholder="Nota de decisión"
-                          className="rounded border border-slate-300 px-2 py-1 text-sm"
+                          placeholder="Nota de decisión (opcional)"
+                          className="field sm:max-w-xs"
                         />
                         <button name="decision" value="aprobada" className="btn-primary text-sm">
                           Aprobar

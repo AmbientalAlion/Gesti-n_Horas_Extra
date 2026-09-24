@@ -56,7 +56,7 @@ export function DonutChart({
           cy={cy}
           r={r}
           fill="none"
-          stroke="#e2e8f0"
+          className="stroke-slate-200 dark:stroke-slate-700"
           strokeWidth={stroke}
           pathLength={100}
         />
@@ -92,7 +92,7 @@ export function DonutChart({
             x={cx}
             y={cy + 16}
             textAnchor="middle"
-            className="fill-slate-400"
+            className="fill-slate-500"
             style={{ fontSize: 11 }}
           >
             {centerLabel}
@@ -114,7 +114,7 @@ export function DonutChart({
               <span className="ml-auto font-semibold tabular-nums text-brand-dark">
                 {s.value}
               </span>
-              <span className="w-10 text-right text-xs text-slate-400">
+              <span className="w-10 text-right text-xs text-slate-500">
                 {pct.toFixed(0)}%
               </span>
             </li>

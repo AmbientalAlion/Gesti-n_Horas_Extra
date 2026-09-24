@@ -60,6 +60,7 @@ export function DashboardView({
   toolbar,
   filterOptions,
   filters,
+  query,
 }: {
   statuses: EmployeeStatus[];
   summary: PlantSummary;
@@ -72,6 +73,8 @@ export function DashboardView({
   toolbar?: React.ReactNode;
   filterOptions?: FilterOptions;
   filters?: Filters;
+  /** Query string vigente (filtros y mes), para no perder el contexto. */
+  query?: string;
 }) {
   const critical = statuses
     .filter((s) => s.level === "red")
@@ -95,12 +98,16 @@ export function DashboardView({
         100
       : 0;
 
-  const empLink = (id: string) =>
-    `${hrefBase}/${id}${roleParam ? `?rol=${roleParam}` : ""}`;
+  // Los enlaces a la ficha arrastran los filtros vigentes para poder volver
+  // al panel exactamente como estaba.
+  const empLink = (id: string) => {
+    const qs = [query, roleParam ? `rol=${roleParam}` : ""].filter(Boolean).join("&");
+    return `${hrefBase}/${id}${qs ? `?${qs}` : ""}`;
+  };
 
   return (
     <div className="space-y-6">
-      <header className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-6 py-5">
+      <header className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-4 sm:px-6 sm:py-5">
         <FigureCluster />
         <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -110,18 +117,62 @@ export function DashboardView({
               </span>
             </div>
             <h1 className="text-2xl font-bold text-brand-dark">Panel de control</h1>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-600">
               {scopeLabel} · Semana {period.week} · {MONTHS[period.month - 1]}{" "}
               {period.year}
             </p>
-            <p className="mt-1 max-w-xl text-xs text-slate-500">{ROLE_FOCUS[role].focus}</p>
+            <p className="mt-1 max-w-[65ch] text-[15px] leading-relaxed text-slate-600">
+              {ROLE_FOCUS[role].focus}
+            </p>
           </div>
           {toolbar && <div className="flex items-center gap-2">{toolbar}</div>}
         </div>
       </header>
 
+      {/* Cómo leer el panel: la regla que manda y qué significa cada estado. */}
+      <section className="rounded-xl border border-brand/20 bg-brand-tint px-4 py-4 sm:px-5">
+        <h2 className="text-sm font-semibold text-brand-dark">Cómo leer este panel</h2>
+        <p className="mt-1 max-w-[70ch] text-sm leading-relaxed text-slate-600">
+          El límite que no se puede superar es <strong>mensual: 48 horas extra por
+          persona</strong>. Pasar de 12 horas extra en una semana está permitido; aquí
+          solo se informa para que usted reparta mejor los turnos.
+        </p>
+        <dl className="mt-3 grid gap-3 sm:grid-cols-3">
+          {[
+            {
+              dot: "bg-status-green",
+              t: "Normal",
+              d: "Menos de 40 horas extra en el mes y la proyección cierra dentro de las 48.",
+            },
+            {
+              dot: "bg-status-yellow",
+              t: "Preventivo",
+              d: "Llegó a 40 horas extra en el mes, o la proyección de cierre superaría las 48. Revise antes de asignarle más turnos.",
+            },
+            {
+              dot: "bg-status-red",
+              t: "Crítico",
+              d: "Superó las 48 horas extra del mes. No debe asignársele más horas extra en este periodo.",
+            },
+          ].map((s) => (
+            <div key={s.t} className="rounded-lg bg-white/70 p-3">
+              <dt className="flex items-center gap-2 text-[13px] font-semibold text-brand-dark">
+                <span className={`h-2.5 w-2.5 rounded-full ${s.dot}`} aria-hidden />
+                {s.t}
+              </dt>
+              <dd className="mt-1 text-[13px] leading-snug text-slate-600">{s.d}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
       {/* Buscador rápido de empleados (typeahead). */}
-      <EmployeeSearch rows={statuses} hrefBase={hrefBase} roleParam={roleParam} />
+      <EmployeeSearch
+        rows={statuses}
+        hrefBase={hrefBase}
+        roleParam={roleParam}
+        query={query}
+      />
 
       {filterOptions && filters && (
         <DashboardFilters options={filterOptions} current={filters} />
@@ -129,32 +180,38 @@ export function DashboardView({
 
       {/* KPIs */}
       <section className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-        <StatCard label="Empleados" value={summary.totalEmployees} />
         <StatCard
-          label="🔴 Excede el mes"
+          label="Personas en la vista"
+          value={summary.totalEmployees}
+          hint="Según los filtros aplicados"
+        />
+        <StatCard
+          label="Excedieron el mes"
           value={summary.red}
           tone="red"
-          hint="> 48h extra"
+          hint="Más de 48h extra acumuladas"
         />
         <StatCard
-          label="En riesgo (proyección)"
+          label="En riesgo de excederse"
           value={summary.atRiskMonthly}
           tone={summary.atRiskMonthly > 0 ? "yellow" : "default"}
-          hint="superaría 48h"
+          hint="La proyección de cierre pasa de 48h"
         />
         <StatCard
-          label="Horas extra (mes)"
+          label="Horas extra del mes"
           value={`${summary.totalMonthlyOvertime.toFixed(0)}h`}
+          hint="Suma de todas las personas de la vista"
         />
         <StatCard
-          label="Semanas altas"
+          label="Semanas por encima de 12h"
           value={summary.weeklyHigh}
-          hint="> 12h (permitido)"
+          hint="Informativo: el límite que cuenta es el mensual"
         />
         <StatCard
-          label="Registros con error"
+          label="Registros por revisar"
           value={summary.withErrors}
           tone={summary.withErrors > 0 ? "yellow" : "default"}
+          hint="Horas huérfanas: turnos de más de 16h sin salida"
         />
       </section>
 
@@ -182,7 +239,7 @@ export function DashboardView({
             <h3 className="mb-1 text-sm font-semibold text-brand-dark">
               Horas extra por semana
             </h3>
-            <p className="mb-3 text-xs text-slate-400">
+            <p className="mb-3 text-xs text-slate-500">
               Total del alcance · consumo del límite legal ≈{" "}
               {avgConsumption.toFixed(0)}% del presupuesto mensual
             </p>
@@ -196,7 +253,7 @@ export function DashboardView({
 
           <div className="rounded-lg border border-slate-100 p-4">
             <h3 className="mb-4 text-sm font-semibold text-brand-dark">
-              Horas extra por área <span className="font-normal text-slate-400">· toca para filtrar</span>
+              Horas extra por área <span className="font-normal text-slate-500">· toca para filtrar</span>
             </h3>
             <HBarChart
               drill={{ param: "area", clear: ["ceco"] }}
@@ -225,7 +282,7 @@ export function DashboardView({
 
           <div className="rounded-lg border border-slate-100 p-4">
             <h3 className="mb-4 text-sm font-semibold text-brand-dark">
-              Horas extra por planta <span className="font-normal text-slate-400">· toca para filtrar</span>
+              Horas extra por planta <span className="font-normal text-slate-500">· toca para filtrar</span>
             </h3>
             <HBarChart
               color="#00CBBF"
@@ -240,7 +297,7 @@ export function DashboardView({
 
           <div className="rounded-lg border border-slate-100 p-4">
             <h3 className="mb-4 text-sm font-semibold text-brand-dark">
-              Horas extra por dirección <span className="font-normal text-slate-400">· toca para filtrar</span>
+              Horas extra por dirección <span className="font-normal text-slate-500">· toca para filtrar</span>
             </h3>
             <HBarChart
               color="#003865"
@@ -276,7 +333,7 @@ export function DashboardView({
               En riesgo de superar 48h
             </h3>
             {atRisk.length === 0 ? (
-              <p className="py-4 text-center text-sm text-slate-400">
+              <p className="py-4 text-center text-sm text-slate-500">
                 Ningún empleado proyecta superar el límite mensual.
               </p>
             ) : (
@@ -289,7 +346,7 @@ export function DashboardView({
                     >
                       {s.name ?? s.code}
                     </a>
-                    <span className="hidden truncate text-xs text-slate-400 sm:block">
+                    <span className="hidden truncate text-xs text-slate-500 sm:block">
                       {s.area}
                     </span>
                     <span className="ml-auto shrink-0 tabular-nums text-slate-600">
@@ -309,7 +366,7 @@ export function DashboardView({
               Reincidentes · 2+ semanas por encima de 12h
             </h3>
             {charts.reincidentes.length === 0 ? (
-              <p className="py-4 text-center text-sm text-slate-400">
+              <p className="py-4 text-center text-sm text-slate-500">
                 Sin reincidentes este mes.
               </p>
             ) : (
@@ -341,7 +398,7 @@ export function DashboardView({
         defaultOpen={false}
       >
         {rotation.length === 0 ? (
-          <p className="py-4 text-center text-sm text-slate-400">Sin candidatos.</p>
+          <p className="py-4 text-center text-sm text-slate-500">Sin candidatos.</p>
         ) : (
           <HBarChart
             unit="h"
@@ -386,6 +443,7 @@ export function DashboardView({
           rows={statuses}
           hrefBase={hrefBase}
           roleParam={roleParam}
+          query={query}
         />
       </CollapsibleCard>
     </div>

@@ -1,6 +1,8 @@
 "use client";
 
+import { useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import clsx from "clsx";
 import type { FilterOptions, Filters } from "@/lib/aggregate";
 
 const KEYS = ["planta", "direccion", "area", "ceco", "jefe"];
@@ -15,6 +17,14 @@ const DEPENDENTS: Record<string, string[]> = {
   jefe: [],
 };
 
+const LABELS: Record<string, string> = {
+  planta: "Planta",
+  direccion: "Dirección",
+  area: "Área",
+  ceco: "Centro de costo",
+  jefe: "Jefe",
+};
+
 export function DashboardFilters({
   options,
   current,
@@ -24,28 +34,39 @@ export function DashboardFilters({
 }) {
   const router = useRouter();
   const params = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+
+  const go = (next: URLSearchParams) => {
+    startTransition(() => router.push(`?${next.toString()}`, { scroll: false }));
+  };
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params.toString());
     if (value) next.set(key, value);
     else next.delete(key);
     for (const dep of DEPENDENTS[key] ?? []) next.delete(dep);
-    router.push(`?${next.toString()}`);
+    go(next);
+  };
+
+  const clearOne = (key: string) => {
+    const next = new URLSearchParams(params.toString());
+    next.delete(key);
+    go(next);
   };
 
   const clearAll = () => {
     const next = new URLSearchParams(params.toString());
     KEYS.forEach((k) => next.delete(k));
-    router.push(`?${next.toString()}`);
+    go(next);
   };
 
-  const active = !!(
-    current.plant ||
-    current.direccion ||
-    current.area ||
-    current.costCenter ||
-    current.manager
-  );
+  const activos: { key: string; value: string }[] = [
+    { key: "planta", value: current.plant ?? "" },
+    { key: "direccion", value: current.direccion ?? "" },
+    { key: "area", value: current.area ?? "" },
+    { key: "ceco", value: current.costCenter ?? "" },
+    { key: "jefe", value: current.manager ?? "" },
+  ].filter((f) => f.value);
 
   const select = (
     label: string,
@@ -53,12 +74,16 @@ export function DashboardFilters({
     value: string | undefined,
     opts: string[]
   ) => (
-    <label className="text-xs">
-      <span className="mb-1 block text-slate-500">{label}</span>
+    <div>
+      <label className="label-field" htmlFor={`filtro-${key}`}>
+        {label}
+      </label>
       <select
+        id={`filtro-${key}`}
         value={value ?? ""}
         onChange={(e) => setParam(key, e.target.value)}
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        disabled={isPending}
+        className="field"
       >
         <option value="">Todas</option>
         {opts.map((o) => (
@@ -67,11 +92,57 @@ export function DashboardFilters({
           </option>
         ))}
       </select>
-    </label>
+    </div>
   );
 
   return (
-    <div className="card print:hidden">
+    <div
+      className={clsx(
+        "card transition-opacity print:hidden",
+        isPending && "pointer-events-none opacity-60"
+      )}
+      aria-busy={isPending}
+    >
+      {activos.length > 0 && (
+        <div
+          className="mb-3 flex flex-wrap items-center gap-2"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="text-[13px] font-semibold text-brand-dark">
+            Viendo solo:
+          </span>
+          {activos.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => clearOne(f.key)}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-brand-tint px-3 py-1 text-xs font-medium text-brand-dark transition hover:bg-brand/20"
+              title={`Quitar el filtro de ${LABELS[f.key]}`}
+            >
+              <span className="text-slate-600">{LABELS[f.key]}:</span> {f.value}
+              <span aria-hidden>×</span>
+              <span className="sr-only">Quitar filtro</span>
+            </button>
+          ))}
+          <button
+            onClick={clearAll}
+            className="min-h-9 text-xs font-semibold text-brand-dark underline underline-offset-2 hover:no-underline"
+          >
+            Quitar todos los filtros
+          </button>
+        </div>
+      )}
+
+      <p className="mb-3 text-[13px] text-slate-600">
+        Al cambiar un filtro más amplio se limpian los de abajo, para que la
+        selección sea coherente.
+        {isPending && (
+          <span className="ml-2 font-medium text-brand-dark">
+            Actualizando el panel…
+          </span>
+        )}
+      </p>
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {select("Planta / sede", "planta", current.plant, options.plants)}
         {select("Dirección", "direccion", current.direccion, options.directions)}
@@ -79,14 +150,6 @@ export function DashboardFilters({
         {select("Centro de costo", "ceco", current.costCenter, options.costCenters)}
         {select("Jefe / supervisor", "jefe", current.manager, options.managers)}
       </div>
-      {active && (
-        <button
-          onClick={clearAll}
-          className="mt-3 text-xs font-medium text-brand hover:text-brand-dark"
-        >
-          Limpiar filtros
-        </button>
-      )}
     </div>
   );
 }

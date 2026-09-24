@@ -32,6 +32,12 @@ export default async function DashboardPage({
     manager: searchParams.jefe || undefined,
   };
 
+  // Query vigente (filtros + mes) para que los enlaces a la ficha vuelvan aquí
+  // con el panel tal como el usuario lo dejó.
+  const query = new URLSearchParams(
+    Object.entries(searchParams).filter(([, v]) => v) as [string, string][]
+  ).toString();
+
   const { statuses, summary, charts, demo, role, filterOptions } =
     await getDashboardData(period, filters);
 
@@ -55,6 +61,7 @@ export default async function DashboardPage({
         role={role === "demo" ? "demo" : role}
         filterOptions={filterOptions}
         filters={filters}
+        query={query}
         toolbar={
           <>
             <MonthSelector year={year} month={month} />

@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { corregirRegistro, descartarRegistro } from "./actions";
+import { SubmitButton } from "@/components/SubmitButton";
+import { PageHeader } from "@/components/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -31,21 +33,21 @@ export default async function RevisionesPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-brand-dark">Bandeja de horas huérfanas</h1>
-        <p className="text-sm text-slate-500">
-          Registros congelados por turnos anómalos (&gt;16h sin marcación). Corrija
-          las horas o descarte el registro; queda trazabilidad del responsable.
-        </p>
-      </header>
+      <PageHeader
+        title="Horas huérfanas por revisar"
+        subtitle="Aquí quedan congelados los registros con turnos de más de 16 horas sin marcación de salida: no suman al acumulado hasta que usted los resuelva. Corrija las horas reales o descarte el registro; queda constancia de quién lo hizo."
+      />
 
       <section>
         <h2 className="mb-3 text-lg font-semibold text-brand-dark">
           Pendientes ({pendientes.length})
         </h2>
         {pendientes.length === 0 ? (
-          <div className="card text-center text-sm text-slate-500">
-            No hay registros pendientes de revisión. 👍
+          <div className="card text-center">
+            <p className="text-sm font-medium text-brand-dark">Todo al día</p>
+            <p className="mt-1 text-sm text-slate-600">
+              No hay registros congelados por revisar.
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -78,17 +80,21 @@ export default async function RevisionesPage() {
                         step="0.5"
                         min="0"
                         defaultValue={Number(r.total_hours)}
-                        className="w-24 rounded border border-slate-300 px-2 py-1 text-sm"
+                        className="field w-28"
                         required
                       />
-                      <span className="text-xs text-slate-400">horas reales</span>
+                      <span className="text-[13px] text-slate-600">horas reales</span>
                     </div>
                     <input
                       name="nota"
                       placeholder="Motivo / observación"
-                      className="mt-2 w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="field mt-2"
                     />
-                    <button className="btn-primary mt-2 w-full text-sm">Corregir y reincorporar</button>
+                    <SubmitButton
+                      label="Corregir y reincorporar"
+                      pendingLabel="Corrigiendo…"
+                      className="mt-2 w-full"
+                    />
                   </form>
 
                   <form action={descartarRegistro} className="rounded-lg border border-slate-200 bg-white p-3">
@@ -97,11 +103,14 @@ export default async function RevisionesPage() {
                     <input
                       name="nota"
                       placeholder="Motivo del descarte"
-                      className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="field"
                     />
-                    <button className="btn-secondary mt-2 w-full text-sm">
-                      Descartar (no se contabiliza)
-                    </button>
+                    <SubmitButton
+                      label="Descartar del cómputo"
+                      pendingLabel="Descartando…"
+                      variant="secondary"
+                      className="mt-2 w-full"
+                    />
                   </form>
                 </div>
               </div>

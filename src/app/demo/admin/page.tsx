@@ -38,7 +38,7 @@ export default function DemoAdmin() {
                 <tr key={u.email}>
                   <td className="px-4 py-2">
                     <div className="font-medium text-slate-900">{u.name}</div>
-                    <div className="text-xs text-slate-400">{u.email}</div>
+                    <div className="text-xs text-slate-500">{u.email}</div>
                   </td>
                   <td className="px-4 py-2 text-slate-600">{u.role}</td>
                 </tr>
@@ -66,7 +66,7 @@ export default function DemoAdmin() {
                 <tr key={e.id}>
                   <td className="px-4 py-2">
                     <div className="font-medium text-slate-900">{e.name}</div>
-                    <div className="text-xs text-slate-400">{e.code}</div>
+                    <div className="text-xs text-slate-500">{e.code}</div>
                   </td>
                   <td className="px-4 py-2 text-slate-600">{e.area}</td>
                   <td className="px-4 py-2 text-slate-600">{e.managerName ?? "Sin asignar"}</td>
