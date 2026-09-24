@@ -52,6 +52,14 @@ body {
 .dark .bg-brand-tint {
   background-color: #10233a !important;
 }
+/* Blancos translúcidos (chips de la leyenda, tarjetas sobre azul 7%). */
+.dark .bg-white\/70,
+.dark .bg-white\/80 {
+  background-color: rgba(19, 28, 46, 0.9) !important;
+}
+.dark .hover\:bg-white:hover {
+  background-color: #1c2740 !important;
+}
 .dark .text-slate-900 {
   color: #e2e8f0 !important;
 }
@@ -178,6 +186,17 @@ body {
 }
 .dark .focus\:ring-brand\/20:focus {
   --tw-ring-color: rgba(0, 152, 186, 0.55) !important;
+}
+
+/* Quien pide menos movimiento en su sistema no ve animaciones. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @media print {

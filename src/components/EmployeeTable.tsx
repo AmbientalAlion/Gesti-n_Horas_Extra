@@ -1,6 +1,9 @@
-import Link from "next/link";
+"use client";
+
 import clsx from "clsx";
 import { StatusBadge } from "./StatusBadge";
+import { EmployeeLink } from "./drawer/EmployeeLink";
+import { useDrawer } from "./drawer/context";
 import type { EmployeeStatus } from "@/lib/aggregate";
 import { RULES } from "@/lib/overtime";
 
@@ -25,6 +28,8 @@ export function EmployeeTable({
   /** Filtros vigentes, para volver al panel tal como estaba. */
   query?: string;
 }) {
+  const drawer = useDrawer();
+  const openRow = (id: string) => drawer?.open({ kind: "employee", id });
   const linkFor = (id: string) => {
     if (!hrefBase) return undefined;
     const qs = [query, roleParam ? `rol=${roleParam}` : ""]
@@ -50,16 +55,21 @@ export function EmployeeTable({
       {/* Teléfono: una tarjeta por persona (la tabla de 8 columnas no cabe). */}
       <ul className="divide-y divide-slate-100 sm:hidden">
         {rows.map((r) => (
-          <li key={r.id} className="px-4 py-3">
+          <li
+            key={r.id}
+            onClick={() => openRow(r.id)}
+            className={clsx("px-4 py-3 transition", drawer && "cursor-pointer hover:bg-slate-50")}
+          >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 {linkFor(r.id) ? (
-                  <Link
-                    href={linkFor(r.id)!}
+                  <EmployeeLink
+                    id={r.id}
+                    href={linkFor(r.id)}
                     className="block truncate font-medium text-brand-dark underline-offset-2 hover:underline"
                   >
                     {r.name ?? r.code}
-                  </Link>
+                  </EmployeeLink>
                 ) : (
                   <span className="block truncate font-medium text-slate-900">
                     {r.name ?? r.code}
@@ -124,15 +134,20 @@ export function EmployeeTable({
         </thead>
         <tbody className="divide-y divide-slate-100">
           {rows.map((r) => (
-            <tr key={r.id} className="hover:bg-slate-50">
+            <tr
+              key={r.id}
+              onClick={() => openRow(r.id)}
+              className={clsx("transition-colors hover:bg-slate-50", drawer && "cursor-pointer")}
+            >
               <td className="px-4 py-3.5">
                 {linkFor(r.id) ? (
-                  <Link
-                    href={linkFor(r.id)!}
+                  <EmployeeLink
+                    id={r.id}
+                    href={linkFor(r.id)}
                     className="font-medium text-brand-dark underline-offset-2 hover:underline"
                   >
                     {r.name ?? r.code}
-                  </Link>
+                  </EmployeeLink>
                 ) : (
                   <div className="font-medium text-slate-900">{r.name ?? r.code}</div>
                 )}

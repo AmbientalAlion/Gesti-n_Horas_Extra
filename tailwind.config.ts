@@ -27,6 +27,27 @@ const config: Config = {
       fontFamily: {
         sans: ['"Mulish"', '"Muli"', "Arial", "sans-serif"],
       },
+      // Movimiento sobrio: entradas suaves y barras que crecen. Se anulan con
+      // prefers-reduced-motion (ver globals.css).
+      keyframes: {
+        "fade-in-up": {
+          "0%": { opacity: "0", transform: "translateY(8px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "fade-in": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        "grow-x": {
+          "0%": { transform: "scaleX(0)" },
+          "100%": { transform: "scaleX(1)" },
+        },
+      },
+      animation: {
+        "fade-in-up": "fade-in-up 450ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+        "fade-in": "fade-in 250ms ease-out both",
+        "grow-x": "grow-x 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+      },
     },
   },
   plugins: [],

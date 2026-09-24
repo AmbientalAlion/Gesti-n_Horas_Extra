@@ -1,4 +1,8 @@
+"use client";
+
 import type { HeatmapData } from "@/lib/aggregate";
+import { useDrawer } from "../drawer/context";
+import { groupView } from "../drawer/views";
 
 // Mapa de calor área × semana (horas extra). Escala secuencial de un solo tono
 // (Azul ALIÓN, claro→oscuro). Valor en cada celda + <title>.
@@ -16,6 +20,9 @@ function shade(value: number, max: number): { bg: string; fg: string } {
 }
 
 export function Heatmap({ data }: { data: HeatmapData }) {
+  const drawer = useDrawer();
+  const openArea = (area: string) => drawer?.open(groupView("area", area));
+
   if (data.areas.length === 0 || data.weeks.length === 0) {
     return <p className="py-6 text-center text-sm text-slate-500">Sin datos.</p>;
   }
@@ -36,19 +43,30 @@ export function Heatmap({ data }: { data: HeatmapData }) {
         <tbody>
           {data.areas.map((area) => (
             <tr key={area}>
-              <td className="whitespace-nowrap p-1 pr-3 text-xs text-slate-600">{area}</td>
+              <td className="p-0 pr-2">
+                <button
+                  type="button"
+                  onClick={() => openArea(area)}
+                  className="block max-w-[16rem] truncate rounded-md px-1.5 py-2 text-left text-[13px] text-slate-700 transition hover:bg-brand-tint hover:text-brand-dark"
+                  title={`Ver el detalle de ${area}`}
+                >
+                  {area}
+                </button>
+              </td>
               {data.weeks.map((w) => {
                 const v = data.values[area]?.[w] ?? 0;
                 const { bg, fg } = shade(v, data.max);
                 return (
                   <td key={w} className="p-0">
-                    <div
-                      className="flex h-10 min-w-[42px] items-center justify-center rounded-md text-xs font-medium tabular-nums"
+                    <button
+                      type="button"
+                      onClick={() => openArea(area)}
+                      className="flex h-10 w-full min-w-[42px] items-center justify-center rounded-md text-xs font-medium tabular-nums transition hover:scale-105 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
                       style={{ backgroundColor: bg, color: fg }}
                       title={`${area} · Semana ${w}: ${v.toFixed(1)}h extra`}
                     >
                       {v > 0 ? v.toFixed(0) : ""}
-                    </div>
+                    </button>
                   </td>
                 );
               })}
@@ -57,7 +75,7 @@ export function Heatmap({ data }: { data: HeatmapData }) {
         </tbody>
       </table>
       <p className="mt-2 text-xs text-slate-500">
-        Horas extra por área y semana · más oscuro = más horas
+        Horas extra por área y semana · más oscuro = más horas · toque un área o una celda para ver quién las hizo
       </p>
     </div>
   );

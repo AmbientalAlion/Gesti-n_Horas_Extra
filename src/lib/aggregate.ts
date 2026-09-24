@@ -442,7 +442,15 @@ export interface Reincidente {
   weeksHigh: number;
 }
 
+export interface EmployeeWeek {
+  week: number;
+  overtime: number;
+  hasError: boolean;
+}
+
 export interface DashboardCharts {
+  /** Semanas del mes por empleado (para el panel lateral de detalle). */
+  weeksByEmployee: Record<string, EmployeeWeek[]>;
   byArea: AreaOvertime[];
   byDireccion: GroupOvertime[];
   byPlant: GroupOvertime[];
@@ -556,7 +564,30 @@ export function computeDashboardCharts(
     })
     .sort((a, b) => b.weeksHigh - a.weeksHigh);
 
-  return { byArea, byDireccion, byPlant, weeklyTrend, topEmployees, heatmap, reincidentes };
+  // Semanas del mes por empleado, ordenadas (alimenta el panel de detalle).
+  const weeksByEmployee: Record<string, EmployeeWeek[]> = {};
+  for (const r of records) {
+    if (r.month !== period.month || r.year !== period.year) continue;
+    (weeksByEmployee[r.employeeId] ??= []).push({
+      week: r.week,
+      overtime: r.hasError ? 0 : r.overtimeHours,
+      hasError: r.hasError,
+    });
+  }
+  for (const k of Object.keys(weeksByEmployee)) {
+    weeksByEmployee[k].sort((a, b) => a.week - b.week);
+  }
+
+  return {
+    weeksByEmployee,
+    byArea,
+    byDireccion,
+    byPlant,
+    weeklyTrend,
+    topEmployees,
+    heatmap,
+    reincidentes,
+  };
 }
 
 function groupBy<T, K>(items: T[], key: (item: T) => K): Map<K, T[]> {

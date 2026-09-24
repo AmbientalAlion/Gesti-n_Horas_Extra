@@ -1,3 +1,7 @@
+"use client";
+
+import { useDrawer, type Segment } from "../drawer/context";
+
 // Dona de distribución (estado del semáforo). Colores de estado + leyenda con
 // etiqueta y valor (identidad nunca solo por color).
 
@@ -5,6 +9,8 @@ export interface DonutSegment {
   label: string;
   value: number;
   color: string;
+  /** Lista que se abre en el panel al tocar este estado. */
+  segment?: Segment;
 }
 
 export function DonutChart({
@@ -14,6 +20,7 @@ export function DonutChart({
   segments: DonutSegment[];
   centerLabel?: string;
 }) {
+  const drawer = useDrawer();
   const total = segments.reduce((a, s) => a + s.value, 0);
   const cx = 80;
   const cy = 80;
@@ -100,23 +107,36 @@ export function DonutChart({
         )}
       </svg>
 
-      <ul className="w-full space-y-2 text-sm">
+      <ul className="w-full space-y-1 text-sm">
         {segments.map((s) => {
           const pct = total > 0 ? (s.value / total) * 100 : 0;
           return (
-            <li key={s.label} className="flex items-center gap-2">
-              <span
-                className="h-3 w-3 shrink-0 rounded-sm"
-                style={{ backgroundColor: s.color }}
-                aria-hidden
-              />
-              <span className="text-slate-600">{s.label}</span>
-              <span className="ml-auto font-semibold tabular-nums text-brand-dark">
-                {s.value}
-              </span>
-              <span className="w-10 text-right text-xs text-slate-500">
-                {pct.toFixed(0)}%
-              </span>
+            <li key={s.label}>
+              <button
+                type="button"
+                disabled={!drawer || !s.segment}
+                onClick={() => s.segment && drawer?.open({ kind: "segment", segment: s.segment })}
+                className="group flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left transition hover:bg-brand-tint disabled:cursor-default disabled:hover:bg-transparent"
+                title={s.segment ? `Ver a las personas en estado ${s.label.toLowerCase()}` : undefined}
+              >
+                <span
+                  className="h-3 w-3 shrink-0 rounded-sm"
+                  style={{ backgroundColor: s.color }}
+                  aria-hidden
+                />
+                <span className="text-slate-700">{s.label}</span>
+                <span className="ml-auto font-semibold tabular-nums text-brand-dark">
+                  {s.value}
+                </span>
+                <span className="w-10 text-right text-xs text-slate-500">
+                  {pct.toFixed(0)}%
+                </span>
+                {s.segment && drawer && (
+                  <span className="text-slate-400 transition group-hover:translate-x-0.5" aria-hidden>
+                    ›
+                  </span>
+                )}
+              </button>
             </li>
           );
         })}

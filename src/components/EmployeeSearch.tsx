@@ -5,6 +5,7 @@ import Link from "next/link";
 import clsx from "clsx";
 import type { EmployeeStatus } from "@/lib/aggregate";
 import type { SemaphoreLevel } from "@/lib/types";
+import { useDrawer } from "./drawer/context";
 
 const DOT: Record<SemaphoreLevel, string> = {
   green: "bg-status-green",
@@ -28,6 +29,7 @@ export function EmployeeSearch({
   /** Filtros vigentes, para volver al panel tal como estaba. */
   query?: string;
 }) {
+  const drawer = useDrawer();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -86,7 +88,13 @@ export function EmployeeSearch({
             if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.min(a + 1, results.length - 1)); }
             else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
             else if (e.key === "Enter" && results[active]) {
-              window.location.href = link(results[active].id);
+              const id = results[active].id;
+              if (drawer) {
+                drawer.open({ kind: "employee", id });
+                setOpen(false);
+              } else {
+                window.location.href = link(id);
+              }
             } else if (e.key === "Escape") setOpen(false);
           }}
           placeholder="Buscar empleado por nombre, ID, área, dirección, planta o jefe…"
@@ -125,7 +133,12 @@ export function EmployeeSearch({
                   <Link
                     href={link(r.id)}
                     tabIndex={-1}
-                    onClick={() => setOpen(false)}
+                    onClick={(e) => {
+                      setOpen(false);
+                      if (!drawer || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                      e.preventDefault();
+                      drawer.open({ kind: "employee", id: r.id });
+                    }}
                     onMouseEnter={() => setActive(i)}
                     className={clsx(
                       "flex items-center gap-3 px-4 py-2.5 transition",
