@@ -16,14 +16,17 @@ export interface BiometricRow {
   maxShiftHours?: number;
 }
 
-/** Registro semanal consolidado de un empleado. */
+/**
+ * Horas de un empleado en un TRAMO: la parte de una semana ISO dentro de un
+ * mes calendario. Una semana que cruza de mes produce dos registros.
+ */
 export interface WeeklyRecord {
   employeeId: string;
-  /** Año ISO. */
+  /** Año calendario del mes del tramo. */
   year: number;
-  /** Número de semana ISO (1-53). */
+  /** Número de semana ISO (1-53) a la que pertenece el tramo. */
   week: number;
-  /** Mes (1-12) al que se imputa la semana, según su corte. */
+  /** Mes calendario (1-12) del tramo. */
   month: number;
   totalHours: number;
   overtimeHours: number;
@@ -43,43 +46,11 @@ export interface WeeklyRecord {
    * horas totales ni turno máximo (totalHours llega en 0 y no se muestra).
    */
   source?: "biometrico" | "novedades";
-}
-
-export interface WeeklyProjection {
-  /** Promedio de horas por día observado en el corte parcial. */
-  dailyAverage: number;
-  /** Horas totales proyectadas al cierre de la semana. */
-  projectedTotalHours: number;
-  /** Horas extras proyectadas al cierre de la semana. */
-  projectedOvertimeHours: number;
-  /** true si se proyecta superar el límite semanal de extras. */
-  willExceedWeeklyLimit: boolean;
-}
-
-export interface MonthlySummary {
-  employeeId: string;
-  year: number;
-  month: number;
-  totalOvertime: number;
-  weeklyRecords: WeeklyRecord[];
-  hasError: boolean;
-}
-
-export interface StatusEvaluation {
-  level: SemaphoreLevel;
-  reasons: string[];
-  weeklyOvertime: number;
-  monthlyOvertime: number;
-  /** Informativo: superó 12h extra en la semana (PERMITIDO; el límite es mensual). */
-  weeklyHigh: boolean;
-  /** Crítico: superó el límite legal mensual de 48h (NO permitido). */
-  monthlyExceeded: boolean;
-  /** La proyección de cierre de mes superaría las 48h. */
-  willExceedMonthly: boolean;
-}
-
-export interface MonthProjection {
-  weeksElapsed: number;
-  projectedMonthlyOvertime: number;
-  willExceedMonthly: boolean;
+  /** Último día con datos del tramo (`yyyy-mm-dd`). */
+  lastDate?: string;
+  /**
+   * true si las horas se repartieron por días porque el origen (archivo
+   * semanal) no trae fechas y la semana cruza de mes (D-3).
+   */
+  estimated?: boolean;
 }

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import { assignManager, updateRole } from "./actions";
+import { assignManager, setDirecciones, updateRole } from "./actions";
 import { PageHeader } from "@/components/PageHeader";
 import { SubmitButton } from "@/components/SubmitButton";
 
@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 
 const ROLE_LABEL: Record<string, string> = {
   rrhh: "Recursos Humanos",
-  director: "Director General",
-  jefe: "Jefe Inmediato",
+  director: "Director",
+  jefe: "Jefe inmediato",
 };
 
 export default async function AdminPage() {
@@ -19,21 +19,33 @@ export default async function AdminPage() {
   if (profile.role !== "rrhh") redirect("/dashboard");
 
   const supabase = createClient();
-  const [{ data: profiles }, { data: employees }] = await Promise.all([
+  const [{ data: profiles }, { data: employees }, scopesRes] = await Promise.all([
     supabase.from("profiles").select("id, email, full_name, role").order("email"),
     supabase
       .from("employees")
-      .select("id, code, name, area, manager_id")
+      .select("id, code, name, area, direccion, manager_id")
       .order("code"),
+    supabase.from("user_direcciones").select("user_id, direccion"),
   ]);
+  // Si la migración de alcances aún no está aplicada, la tabla no existe.
+  const scopesReady = !scopesRes.error;
+  const scopes = new Map<string, string[]>();
+  for (const r of scopesRes.data ?? []) {
+    scopes.set(r.user_id, [...(scopes.get(r.user_id) ?? []), r.direccion]);
+  }
+  const direcciones = [
+    ...new Set((employees ?? []).map((e) => e.direccion).filter((d): d is string => !!d)),
+  ].sort((a, b) => a.localeCompare(b, "es"));
 
-  const jefes = (profiles ?? []).filter((p) => p.role === "jefe" || p.role === "rrhh");
+  const jefes = (profiles ?? []).filter(
+    (p) => p.role === "jefe" || p.role === "rrhh" || p.role === "director"
+  );
 
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Usuarios y equipos"
-        subtitle="Asigne el rol de cada usuario y vincule a cada empleado con su jefe inmediato. De ese vínculo depende lo que cada jefe puede ver en el panel."
+        title="Usuarios y accesos"
+        subtitle="El rol dice qué puede hacer cada usuario y el alcance a quién puede ver: RRHH ve toda la organización, un director sus direcciones y un jefe a su equipo directo. Una cuenta sin rol no ve datos."
       />
 
       {/* Roles de usuario */}
@@ -44,8 +56,8 @@ export default async function AdminPage() {
             <thead className="bg-slate-50">
               <tr>
                 <th className="th">Usuario</th>
-                <th className="th">Rol actual</th>
-                <th className="th">Cambiar rol</th>
+                <th className="th">Rol</th>
+                <th className="th">Alcance</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -61,22 +73,62 @@ export default async function AdminPage() {
                   <td className="px-4 py-3">
                     <div className="font-medium text-slate-900">{p.full_name ?? p.email}</div>
                     <div className="text-[13px] text-slate-600">{p.email}</div>
+                    <div className="text-[12px] text-slate-500">{p.role ? ROLE_LABEL[p.role] : "Sin rol"}</div>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{ROLE_LABEL[p.role] ?? p.role}</td>
                   <td className="px-4 py-3">
                     <form action={updateRole} className="flex items-center gap-2">
                       <input type="hidden" name="id" value={p.id} />
+                      <label className="sr-only" htmlFor={`rol-${p.id}`}>
+                        Rol de {p.full_name ?? p.email}
+                      </label>
                       <select
+                        id={`rol-${p.id}`}
                         name="role"
-                        defaultValue={p.role}
-                        className="field sm:w-56"
+                        defaultValue={p.role ?? ""}
+                        className="field sm:w-52"
                       >
+                        <option value="">Sin rol (sin acceso)</option>
                         <option value="rrhh">Recursos Humanos</option>
-                        <option value="director">Director General</option>
-                        <option value="jefe">Jefe Inmediato</option>
+                        <option value="director">Director</option>
+                        <option value="jefe">Jefe inmediato</option>
                       </select>
                       <SubmitButton label="Guardar" pendingLabel="Guardando…" variant="secondary" />
                     </form>
+                  </td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {p.role === "rrhh" && "Toda la organización"}
+                    {p.role === "jefe" && "Su equipo directo (ver abajo)"}
+                    {!p.role && <span className="text-slate-500">Ninguno</span>}
+                    {p.role === "director" &&
+                      (scopesReady ? (
+                        <form action={setDirecciones} className="space-y-1.5">
+                          <input type="hidden" name="id" value={p.id} />
+                          <label className="flex items-center gap-2 text-[13px]">
+                            <input
+                              type="checkbox"
+                              name="todas"
+                              defaultChecked={(scopes.get(p.id) ?? []).includes("*")}
+                            />
+                            Todas las direcciones (Director General)
+                          </label>
+                          {direcciones.map((d) => (
+                            <label key={d} className="flex items-center gap-2 text-[13px]">
+                              <input
+                                type="checkbox"
+                                name="direccion"
+                                value={d}
+                                defaultChecked={(scopes.get(p.id) ?? []).includes(d)}
+                              />
+                              {d}
+                            </label>
+                          ))}
+                          <SubmitButton label="Guardar alcance" pendingLabel="Guardando…" variant="secondary" />
+                        </form>
+                      ) : (
+                        <span className="text-[13px] text-amber-700">
+                          Falta aplicar la migración de alcances en la base de datos.
+                        </span>
+                      ))}
                   </td>
                 </tr>
               ))}
@@ -103,7 +155,7 @@ export default async function AdminPage() {
               {(employees ?? []).length === 0 && (
                 <tr>
                   <td colSpan={3} className="px-4 py-8 text-center text-sm text-slate-600">
-                    Todavía no hay empleados. Cárguelos desde «Cargar horas del biométrico».
+                    Todavía no hay empleados. Cárguelos desde «Cargar archivo».
                   </td>
                 </tr>
               )}

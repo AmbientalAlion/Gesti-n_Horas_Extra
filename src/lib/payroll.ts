@@ -38,8 +38,8 @@ export interface PayrollRow {
 
 export const LEVEL_LABEL: Record<SemaphoreLevel, string> = {
   green: "Normal",
-  yellow: "Preventivo",
-  red: "Crítico",
+  yellow: "En riesgo",
+  red: "Excedido",
 };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;

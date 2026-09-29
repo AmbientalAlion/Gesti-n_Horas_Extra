@@ -1,10 +1,10 @@
 "use client";
 
 import clsx from "clsx";
-import { LevelIcon, PendingIcon, StatusBadge } from "../StatusBadge";
-import { BudgetBar } from "../BudgetBar";
-import { RULES } from "@/lib/overtime";
-import type { EmployeeStatus, EmployeeWeek } from "@/lib/aggregate";
+import { LEVEL_LABELS, LevelIcon, PendingIcon, StatusBadge } from "../StatusBadge";
+import { CumulativeChart } from "../charts/CumulativeChart";
+import { fmtH, RULES } from "@/lib/overtime";
+import type { EmployeeStatus, SegmentPoint } from "@/lib/aggregate";
 import type { SemaphoreLevel } from "@/lib/types";
 import type { DrawerView, GroupDim, Segment } from "./context";
 
@@ -14,11 +14,7 @@ const TEXT: Record<SemaphoreLevel, string> = {
   red: "text-status-red",
 };
 
-const LEVEL_LABEL: Record<SemaphoreLevel, string> = {
-  green: "Normal",
-  yellow: "Preventivo",
-  red: "Crítico",
-};
+const LEVEL_LABEL = LEVEL_LABELS;
 
 const DOT: Record<SemaphoreLevel, string> = {
   green: "bg-status-green",
@@ -48,20 +44,16 @@ export const SEGMENT_TEXT: Record<Segment, { title: string; desc: string }> = {
     desc: "Ordenadas de mayor a menor por horas extra del mes. Toque una persona para ver su detalle.",
   },
   red: {
-    title: "Críticos",
-    desc: "Superaron las 48 horas extra del mes. No se les deben asignar más horas extra en este periodo.",
+    title: "Excedieron 48h",
+    desc: "Superaron las 48 horas extra del mes, el límite que no puede pasarse.",
   },
   yellow: {
-    title: "Preventivos",
-    desc: "Llegaron a 40 horas extra en el mes o su proyección de cierre pasaría de 48. Revise antes de asignarles más turnos.",
+    title: "En riesgo",
+    desc: "Su acumulado va por encima de la meta a la fecha (12h por semana, proporcional en semanas parciales), o a su ritmo cerrarían el mes por encima de 48h.",
   },
   green: {
-    title: "Operación normal",
-    desc: "Menos de 40 horas extra en el mes y su proyección cierra dentro del límite.",
-  },
-  atRisk: {
-    title: "En riesgo de excederse",
-    desc: "Todavía no pasan de 48h, pero al ritmo actual cerrarían el mes por encima del límite.",
+    title: "Normal",
+    desc: "Van dentro de la meta a la fecha y su proyección cierra en 48h o menos.",
   },
   errors: {
     title: "Registros por revisar",
@@ -79,10 +71,12 @@ function Stat({
   label,
   value,
   tone,
+  hint,
 }: {
   label: string;
   value: string;
   tone?: "red" | "yellow";
+  hint?: string;
 }) {
   return (
     <div className="rounded-lg border border-slate-200 p-3">
@@ -99,6 +93,7 @@ function Stat({
       >
         {value}
       </p>
+      {hint && <p className="text-[11px] text-slate-500">{hint}</p>}
     </div>
   );
 }
@@ -164,8 +159,8 @@ function Distribution({ members }: { members: EmployeeStatus[] }) {
   const n = members.length || 1;
   const parts: { level: SemaphoreLevel; label: string; count: number }[] = [
     { level: "green", label: "Normal", count: members.filter((m) => m.level === "green").length },
-    { level: "yellow", label: "Preventivo", count: members.filter((m) => m.level === "yellow").length },
-    { level: "red", label: "Crítico", count: members.filter((m) => m.level === "red").length },
+    { level: "yellow", label: "En riesgo", count: members.filter((m) => m.level === "yellow").length },
+    { level: "red", label: "Excedido", count: members.filter((m) => m.level === "red").length },
   ];
   return (
     <div>
@@ -195,22 +190,44 @@ function Distribution({ members }: { members: EmployeeStatus[] }) {
 
 /* ---------------------------------------------------------------- */
 
+/** Datos del mes que necesita el gráfico del panel. */
+export interface DrawerPeriod {
+  daysInMonth: number;
+  cutoffDay: number;
+  /** «Junio 2026». */
+  monthLabel: string;
+  /** «21 de junio», o null sin datos. */
+  cutoffLabel: string | null;
+  closed: boolean;
+}
+
+/** Frase del estado de una persona. */
+export function statusLine(s: EmployeeStatus, p: DrawerPeriod): string {
+  const at = p.cutoffLabel ? ` al ${p.cutoffLabel}` : "";
+  if (s.level === "red") return `Superó el límite de ${RULES.MONTHLY_OVERTIME_LIMIT}h: lleva ${fmtH(s.monthlyOvertime)}`;
+  if (s.risk === "meta") return `${fmtH(s.overTarget)} por encima de la meta${at}`;
+  if (s.risk === "proyeccion") return `Dentro de la meta, pero a este ritmo cerraría en ${fmtH(s.projectedMonthlyOvertime)}`;
+  return p.closed ? "Cerró el mes dentro del límite" : `Dentro de la meta${at}`;
+}
+
 export function EmployeeQuickView({
   s,
-  weeks,
+  segments,
+  period,
   push,
 }: {
   s: EmployeeStatus;
-  weeks: EmployeeWeek[];
+  segments: SegmentPoint[];
+  period: DrawerPeriod;
   push: (v: DrawerView) => void;
 }) {
-  const maxWeek = Math.max(RULES.WEEKLY_OVERTIME_LIMIT, ...weeks.map((w) => w.overtime), 1);
   const chips: { dim: GroupDim; value?: string }[] = [
     { dim: "area", value: s.area },
     { dim: "direccion", value: s.direccion },
     { dim: "planta", value: s.plant },
     { dim: "jefe", value: s.managerName },
   ];
+  const withData = segments.filter((x) => !x.future);
 
   return (
     <div className="space-y-5 motion-safe:animate-fade-in">
@@ -221,6 +238,7 @@ export function EmployeeQuickView({
           {s.roleTitle ? ` · ${s.roleTitle}` : ""}
         </span>
       </div>
+      <p className={clsx("text-sm font-medium", TEXT[s.level])}>{statusLine(s, period)}</p>
 
       {/* Contexto organizacional: cada dato abre su grupo. */}
       <div className="flex flex-wrap gap-2">
@@ -240,89 +258,76 @@ export function EmployeeQuickView({
           ))}
       </div>
 
-      <section className="rounded-xl border border-brand/30 bg-white p-4">
-        <p className="mb-2 text-sm font-medium text-brand-dark">
-          {s.monthlyOvertime > RULES.MONTHLY_OVERTIME_LIMIT
-            ? `Límite mensual superado (${RULES.MONTHLY_OVERTIME_LIMIT}h)`
-            : "Horas extra disponibles este mes"}
-        </p>
-        <BudgetBar
-          used={s.monthlyOvertime}
-          limit={RULES.MONTHLY_OVERTIME_LIMIT}
-          warning={RULES.MONTHLY_OVERTIME_WARNING}
-        />
-        {s.pendingReviewCount > 0 && (
-          <p className="mt-2 rounded-md bg-violet-50 px-2 py-1.5 text-xs text-violet-800">
-            Con {s.pendingReviewCount} registro{s.pendingReviewCount > 1 ? "s" : ""} por
-            revisar, el mes quedaría entre {s.monthlyOvertime.toFixed(1)}h y ≈
-            {s.potentialMonthlyOvertime.toFixed(1)}h según se resuelva
-            {s.pendingReviewCount > 1 ? "n" : ""}.
-          </p>
-        )}
-      </section>
-
       <div className="grid grid-cols-2 gap-3">
         <Stat
-          label={`Extra esta semana (ref. ${RULES.WEEKLY_OVERTIME_LIMIT}h)`}
-          value={`${s.weeklyOvertime.toFixed(1)}h`}
+          label={`Acumulado${period.cutoffLabel ? ` al ${period.cutoffLabel}` : ""}`}
+          value={fmtH(s.monthlyOvertime)}
+          hint={`Meta a esa fecha: ${fmtH(s.target)}`}
+          tone={s.level === "red" ? "red" : s.risk === "meta" ? "yellow" : undefined}
         />
         <Stat
-          label="Proyección de cierre"
-          value={`≈${s.projectedMonthlyOvertime.toFixed(0)}h`}
-          tone={s.willExceedMonthly ? "red" : undefined}
+          label={period.closed ? "Cierre del mes" : "Proyección de cierre"}
+          value={`${period.closed ? "" : "≈"}${fmtH(s.projectedMonthlyOvertime)}`}
+          hint={period.closed ? undefined : s.projectionReliable ? "a su ritmo diario" : "pocos datos: no decide"}
+          tone={!period.closed && s.willExceedMonthly ? "yellow" : undefined}
         />
       </div>
 
+      {s.pendingReviewCount > 0 && (
+        <p className="rounded-md bg-violet-50 px-2 py-1.5 text-xs text-violet-800">
+          Con {s.pendingReviewCount} registro{s.pendingReviewCount > 1 ? "s" : ""} por
+          revisar, el mes quedaría entre {fmtH(s.monthlyOvertime)} y{" "}
+          {fmtH(s.potentialMonthlyOvertime)} según se resuelva
+          {s.pendingReviewCount > 1 ? "n" : ""}.
+        </p>
+      )}
+
+      <section className="rounded-xl border border-slate-200 bg-white p-3">
+        <h3 className="mb-1 text-sm font-semibold text-brand-dark">Acumulado frente a la meta</h3>
+        <CumulativeChart
+          segments={segments}
+          daysInMonth={period.daysInMonth}
+          cutoffDay={period.cutoffDay}
+          monthLabel={period.monthLabel}
+        />
+      </section>
+
       <section>
-        <h3 className="mb-2 text-sm font-semibold text-brand-dark">
-          ¿Cuándo hizo esas horas?
-        </h3>
-        {weeks.length === 0 ? (
-          <p className="text-sm text-slate-600">Sin registros cargados este mes.</p>
+        <h3 className="mb-2 text-sm font-semibold text-brand-dark">¿Cuándo hizo esas horas?</h3>
+        {withData.length === 0 ? (
+          <p className="text-sm text-slate-600">Sin datos cargados este mes.</p>
         ) : (
-          <ul className="space-y-2">
-            {weeks.map((w) => (
-              <li key={w.week} className="flex items-center gap-3 text-sm">
-                <span className="w-14 shrink-0 text-slate-600">Sem {w.week}</span>
-                {w.hasError ? (
-                  // Sin barra de magnitud: esas horas no están validadas.
-                  <span
-                    className={clsx(
-                      "flex min-h-6 flex-1 items-center rounded-md border border-dashed px-2 text-xs",
-                      w.reviewed
-                        ? "border-slate-300 text-slate-500"
-                        : "border-violet-300 bg-violet-50 text-violet-800"
-                    )}
-                  >
-                    {w.reviewed
-                      ? "descartado · no suma"
-                      : `congelado${w.grossHours ? ` · ${w.grossHours.toFixed(0)}h brutas` : ""} sin validar`}
+          <ul className="divide-y divide-slate-100 text-sm">
+            {withData.map((w) => (
+              <li key={w.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                <span className="min-w-[6.5rem] text-slate-700">{w.short}</span>
+                {w.pending ? (
+                  <span className="rounded-md border border-dashed border-violet-300 bg-violet-50 px-2 py-0.5 text-xs text-violet-800">
+                    congelado{w.grossHours ? ` · ${w.grossHours.toFixed(0)}h brutas` : ""} sin validar
+                  </span>
+                ) : w.discarded && w.hours === 0 ? (
+                  <span className="rounded-md border border-dashed border-slate-300 px-2 py-0.5 text-xs text-slate-600">
+                    descartado · no suma
                   </span>
                 ) : (
-                  <span className="relative h-2.5 flex-1 rounded-full bg-slate-100">
-                    <span
-                      className="block h-full origin-left rounded-full bg-brand-light motion-safe:animate-grow-x"
-                      style={{ width: `${Math.max(3, (w.overtime / maxWeek) * 100)}%` }}
-                    />
-                    <span
-                      className="absolute -top-0.5 h-3.5 w-px bg-slate-400"
-                      style={{ left: `${(RULES.WEEKLY_OVERTIME_LIMIT / maxWeek) * 100}%` }}
-                      title={`Referencia ${RULES.WEEKLY_OVERTIME_LIMIT}h`}
-                      aria-hidden
-                    />
+                  <span className="font-semibold tabular-nums text-slate-800">{fmtH(w.hours)}</span>
+                )}
+                <span className="text-xs text-slate-500">meta {fmtH(w.segmentTarget)}</span>
+                {w.weekHigh && (
+                  <span
+                    className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-700"
+                    title={w.weekShared ? "Semana completa, compartida con otro mes" : undefined}
+                  >
+                    Semana &gt; {RULES.WEEKLY_OVERTIME_LIMIT}h ({fmtH(w.weekHours)})
                   </span>
                 )}
-                <span className="w-16 shrink-0 text-right tabular-nums text-slate-800">
-                  {w.hasError ? "—" : `${w.overtime.toFixed(1)}h`}
-                </span>
+                {w.estimated && (
+                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-800">estimado</span>
+                )}
               </li>
             ))}
           </ul>
         )}
-        <p className="mt-2 text-xs text-slate-500">
-          La raya marca la referencia de {RULES.WEEKLY_OVERTIME_LIMIT}h: pasarla en una
-          semana está permitido; el límite que cuenta es el mensual.
-        </p>
       </section>
 
       {s.reasons.length > 0 && (
@@ -356,15 +361,14 @@ export function GroupQuickView({
   const total = members.reduce((a, m) => a + m.monthlyOvertime, 0);
   const n = members.length;
   const red = members.filter((m) => m.level === "red").length;
-  const risk = members.filter((m) => m.level !== "red" && m.willExceedMonthly).length;
-  const consumption = n > 0 ? (total / (n * RULES.MONTHLY_OVERTIME_LIMIT)) * 100 : 0;
+  const risk = members.filter((m) => m.level === "yellow").length;
 
   return (
     <div className="space-y-5 motion-safe:animate-fade-in">
       <div className="grid grid-cols-2 gap-3">
         <Stat label="Personas" value={String(n)} />
-        <Stat label="Horas extra del mes" value={`${total.toFixed(0)}h`} />
-        <Stat label="Críticos" value={String(red)} tone={red > 0 ? "red" : undefined} />
+        <Stat label="Horas extra del mes" value={fmtH(total)} />
+        <Stat label="Excedieron 48h" value={String(red)} tone={red > 0 ? "red" : undefined} />
         <Stat label="En riesgo" value={String(risk)} tone={risk > 0 ? "yellow" : undefined} />
       </div>
 
@@ -372,8 +376,7 @@ export function GroupQuickView({
         <h3 className="mb-2 text-sm font-semibold text-brand-dark">Estado del grupo</h3>
         <Distribution members={members} />
         <p className="mt-2 text-xs text-slate-600">
-          Consumo del límite legal del grupo ≈ {consumption.toFixed(0)}% · promedio{" "}
-          {n > 0 ? (total / n).toFixed(1) : "0"}h por persona
+          Promedio {fmtH(n > 0 ? total / n : 0)} por persona
         </p>
       </section>
 
@@ -389,7 +392,7 @@ export function GroupQuickView({
               <PersonRow
                 key={m.id}
                 s={m}
-                value={`${m.monthlyOvertime.toFixed(1)}h`}
+                value={fmtH(m.monthlyOvertime)}
                 showArea={dim !== "area"}
                 onClick={() => push({ kind: "employee", id: m.id })}
               />
@@ -411,11 +414,13 @@ export function SegmentQuickView({
   push: (v: DrawerView) => void;
 }) {
   const valueOf = (m: EmployeeStatus) =>
-    segment === "atRisk"
-      ? `≈${m.projectedMonthlyOvertime.toFixed(0)}h`
+    segment === "yellow"
+      ? m.risk === "meta"
+        ? `+${fmtH(m.overTarget)} meta`
+        : `≈${fmtH(m.projectedMonthlyOvertime)} cierre`
       : segment === "weeklyHigh"
         ? `${m.highWeeksMonth} sem. >${RULES.WEEKLY_OVERTIME_LIMIT}h`
-        : `${m.monthlyOvertime.toFixed(1)}h`;
+        : fmtH(m.monthlyOvertime);
 
   return (
     <div className="space-y-4 motion-safe:animate-fade-in">

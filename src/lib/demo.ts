@@ -19,7 +19,6 @@ import {
   type PlantSummary,
 } from "./aggregate";
 import type { Role, WeeklyRecord } from "./types";
-import { coveredWeeks } from "./dates";
 
 export function isSupabaseConfigured(): boolean {
   return Boolean(
@@ -28,13 +27,15 @@ export function isSupabaseConfigured(): boolean {
   );
 }
 
-// Junio de 2026: semanas 23–26 (jueves en junio). La demo "vive" en la 25.
+// Junio de 2026 (30 días, empieza lunes): tramos 1–7, 8–14, 15–21, 22–28 y
+// 29–30. La demo tiene datos hasta el 21 de junio: meta acumulada 36,0h.
 export const DEMO_PERIOD: Period = {
   year: 2026,
   month: 6,
   week: 25,
   status: "abierto",
-  weeksInMonth: 4,
+  daysInMonth: 30,
+  cutoffDay: 21,
 };
 
 export const demoEmployees: EmployeeInput[] = [
@@ -46,40 +47,44 @@ export const demoEmployees: EmployeeInput[] = [
   { id: "e6", code: "3001", name: "Gustavo León", area: "PRODUCCIÓN", direccion: "Dirección Industrial", plant: "Bello", costCenter: "EC7EC00020-PRODUCCIÓN", roleTitle: "Técnico", managerId: "m3", managerName: "Jefe Mantenimiento" },
 ];
 
-// Mes 6 de 2026, semanas 23, 24 y 25 (la 25 es la semana en curso).
+// Junio de 2026, tramos del 1 al 21 (semanas ISO 23, 24 y 25).
 export const demoRecords: WeeklyRecord[] = [
-  // Ana -> 🔴 alerta semanal: 14h extra en la semana 25 (>12).
+  // Ana -> Normal (32h frente a 36h) con una semana de más de 12h (15–21 jun).
   rec("e1", 23, 6, 50), // 8 extra
   rec("e1", 24, 6, 52), // 10 extra
   rec("e1", 25, 6, 56), // 14 extra
 
-  // Carlos -> 🟡 preventivo: 10h extra en la semana en curso.
-  rec("e2", 23, 6, 46), // 4
-  rec("e2", 24, 6, 46), // 4
-  rec("e2", 25, 6, 52), // 10 (umbral amarillo semanal)
+  // Carlos -> En riesgo por meta: 38h frente a 36h al 21 de junio.
+  rec("e2", 23, 6, 58), // 16
+  rec("e2", 24, 6, 50), // 8
+  rec("e2", 25, 6, 56), // 14
 
-  // Diana -> ⚠️ registro congelado por horas huérfanas (turno 20h).
+  // Diana -> registro congelado por horas huérfanas (turno de 20h).
   rec("e3", 23, 6, 48), // 6
   { ...rec("e3", 24, 6, 90, true), maxShiftHours: 20 },
   rec("e3", 25, 6, 44), // 2
 
-  // Esteban -> 🟢 operación normal.
+  // Esteban -> Normal, pocas horas.
   rec("e4", 23, 6, 42),
   rec("e4", 24, 6, 43),
   rec("e4", 25, 6, 44), // 2
 
-  // Fernanda -> 🟡 corte parcial: proyección supera el umbral.
-  rec("e5", 23, 6, 44),
-  { ...rec("e5", 25, 6, 33), isPartial: true }, // 33h a mitad de semana
+  // Fernanda -> En riesgo por proyección: 35h (dentro de la meta de 36h),
+  // pero a este ritmo cerraría en 50h.
+  rec("e5", 23, 6, 54), // 12
+  rec("e5", 24, 6, 53), // 11
+  rec("e5", 25, 6, 54), // 12
 
-  // Gustavo -> 🔴 supera el límite legal mensual (>48h extra en el mes).
+  // Gustavo -> Excedido: 52h en el mes.
   rec("e6", 23, 6, 60), // 18
   rec("e6", 24, 6, 60), // 18
-  rec("e6", 25, 6, 58), // 16  => 52 extra en el mes
+  rec("e6", 25, 6, 58), // 16
 ];
 
 // El "jefe" de la demostración gestiona al equipo de Producción (manager m1).
 const DEMO_JEFE_MANAGER = "m1";
+// El "director" de la demostración ve la Dirección Industrial.
+export const DEMO_DIRECTOR_DIRECCION = "Dirección Industrial";
 
 export interface DemoDashboard {
   statuses: EmployeeStatus[];
@@ -95,13 +100,18 @@ export interface DemoDashboard {
  * Datos del dashboard de demostración para una vista de rol, con filtros
  * globales opcionales (planta/área/jefe).
  * - jefe: solo su equipo directo (Producción).
- * - rrhh / director: toda la planta.
+ * - director: solo su dirección.
+ * - rrhh: toda la organización.
  */
 export function demoDashboard(roleView: Role, filters: Filters = {}): DemoDashboard {
+  // Alcance por rol (v2): RRHH ve todo, el director su dirección y el jefe su
+  // equipo directo.
   const scope =
     roleView === "jefe"
       ? demoEmployees.filter((e) => e.managerId === DEMO_JEFE_MANAGER)
-      : demoEmployees;
+      : roleView === "director"
+        ? demoEmployees.filter((e) => e.direccion === DEMO_DIRECTOR_DIRECCION)
+        : demoEmployees;
 
   const filterOptions = buildFilterOptions(scope, filters);
   const employees = applyFilters(scope, filters);
@@ -109,11 +119,7 @@ export function demoDashboard(roleView: Role, filters: Filters = {}): DemoDashbo
   const empIds = new Set(employees.map((e) => e.id));
   const records = demoRecords.filter((r) => empIds.has(r.employeeId));
 
-  // Cobertura sobre todos los registros de la demo (no solo los filtrados).
-  const period: Period = {
-    ...DEMO_PERIOD,
-    coveredWeeks: coveredWeeks(demoRecords, DEMO_PERIOD.year, DEMO_PERIOD.month),
-  };
+  const period: Period = DEMO_PERIOD;
   const statuses = computeEmployeeStatuses(employees, records, period);
   return {
     statuses,
@@ -126,7 +132,6 @@ export function demoDashboard(roleView: Role, filters: Filters = {}): DemoDashbo
   };
 }
 
-/** Exporta las novedades depuradas del periodo demo para una vista de rol. */
 /** Filas de nómina del demo (datos ficticios), respetando el alcance del rol. */
 export function demoPayrollRows(roleView: Role) {
   const { statuses, period } = demoDashboard(roleView);

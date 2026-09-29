@@ -53,92 +53,86 @@ describe("applyFilters", () => {
   });
 });
 
-describe("computeEmployeeStatuses (regla del semáforo)", () => {
+describe("computeEmployeeStatuses (v2)", () => {
   const emp = [{ id: "a", code: "A" }, { id: "b", code: "B" }];
-  // Octubre 2026: semanas 40–44 (5 semanas).
-  const period = { year: 2026, month: 10, week: 41, status: "abierto" as const, weeksInMonth: 5 };
-  const rec = (
-    employeeId: string,
-    week: number,
-    overtimeHours: number,
-    extra: Partial<import("./types").WeeklyRecord> = {}
-  ): import("./types").WeeklyRecord => ({
-    employeeId,
-    year: 2026,
-    week,
-    month: 10,
-    totalHours: 42 + overtimeHours,
-    overtimeHours,
-    isPartial: false,
-    hasError: false,
-    ...extra,
+  type R = import("./types").WeeklyRecord;
+  const rec = (employeeId: string, year: number, month: number, week: number, ot: number, extra: Partial<R> = {}): R => ({
+    employeeId, year, month, week, totalHours: 42 + ot, overtimeHours: ot,
+    isPartial: false, hasError: false, ...extra,
+  });
+  const feb = { year: 2027, month: 2, week: 5, status: "abierto" as const };
+
+  it("CP-04 a CP-07: el caso de 17h en la primera semana de febrero 2027", () => {
+    const r1 = [rec("a", 2027, 2, 5, 17)];
+    const [s1] = computeEmployeeStatuses(emp, r1, { ...feb, cutoffDay: 7 });
+    expect(s1).toMatchObject({ level: "yellow", risk: "meta", overTarget: 5, highWeeksMonth: 1 });
+    expect(s1.reasons[0]).toContain("5,0h por encima de la meta al 7 de febrero");
+
+    const r2 = [...r1, rec("a", 2027, 2, 6, 0)];
+    const [s2] = computeEmployeeStatuses(emp, r2, { ...feb, cutoffDay: 14 });
+    expect(s2).toMatchObject({ level: "green", projectedMonthlyOvertime: 34 });
+    // La alerta semanal de la primera semana sigue en el mes.
+    expect(s2.highWeeks.map((w) => w.label)).toEqual(["1 al 7 feb"]);
+
+    const r3 = [...r2, rec("a", 2027, 2, 7, 20)];
+    const [s3] = computeEmployeeStatuses(emp, r3, { ...feb, cutoffDay: 21 });
+    expect(s3).toMatchObject({ level: "yellow", overTarget: 1, highWeeksMonth: 2 });
+
+    const r4 = [...r3, rec("a", 2027, 2, 8, 10)];
+    const [s4] = computeEmployeeStatuses(emp, r4, { ...feb, cutoffDay: 28, status: "cerrado" });
+    expect(s4).toMatchObject({ level: "green", monthlyOvertime: 47, projectedMonthlyOvertime: 47 });
   });
 
-  it("proyecta con el ritmo de las semanas cubiertas del conjunto", () => {
-    // Semanas 40 y 41 cubiertas; «a» solo tiene registro en la 40.
-    const [a] = computeEmployeeStatuses(emp, [rec("a", 40, 10), rec("b", 41, 5)], period);
-    // 10h en 2 semanas cubiertas → 5h/sem × 3 restantes = 25h.
-    expect(a.projectedMonthlyOvertime).toBe(25);
-    expect(a.level).toBe("green");
+  it("CP-11: la semana del 28 sep al 4 oct se mide completa y se cuenta en octubre", () => {
+    const recs = [rec("a", 2026, 9, 40, 6), rec("a", 2026, 10, 40, 8)];
+    const [sep] = computeEmployeeStatuses(emp, recs, { year: 2026, month: 9, week: 40, cutoffDay: 30, status: "cerrado" });
+    expect(sep.monthlyOvertime).toBe(6);
+    expect(sep.highWeeks).toMatchObject([{ label: "28 sep al 4 oct", hours: 14, shared: true, counted: false }]);
+    expect(sep.highWeeksMonth).toBe(0);
+    const [oct] = computeEmployeeStatuses(emp, recs, { year: 2026, month: 10, week: 40, cutoffDay: 4 });
+    expect(oct.monthlyOvertime).toBe(8);
+    expect(oct.highWeeksMonth).toBe(1);
   });
 
-  it("la proyección nunca queda por debajo de lo acumulado", () => {
-    const recs = [40, 41, 42, 43].map((w) => rec("a", w, 11));
-    const [a] = computeEmployeeStatuses(emp, recs, period);
-    expect(a.monthlyOvertime).toBe(44);
-    expect(a.projectedMonthlyOvertime).toBeGreaterThanOrEqual(44);
-  });
-
-  it("mes cerrado: la proyección es el acumulado", () => {
-    const recs = [40, 41].map((w) => rec("a", w, 20));
-    const [a] = computeEmployeeStatuses(emp, recs, { ...period, status: "cerrado" });
-    expect(a.projectedMonthlyOvertime).toBe(40);
-    expect(a.level).toBe("yellow");
-  });
-
-  it("más de 12h en una semana no pone rojo; cuenta semanas altas del mes", () => {
-    const recs = [rec("a", 40, 14), rec("a", 41, 13), rec("a", 42, 2)];
-    const [a] = computeEmployeeStatuses(emp, recs, { ...period, status: "cerrado" });
-    expect(a.level).toBe("green");
-    expect(a.highWeeksMonth).toBe(2);
-    const s = summarize(computeEmployeeStatuses(emp, recs, period));
-    expect(s.weeklyHigh).toBe(2);
-    expect(s.weeklyHighPeople).toBe(1);
-  });
-
-  it("congelado sin revisar: por revisar, no suma y estima el potencial", () => {
+  it("CP-16: congelado sin revisar no suma y muestra el rango", () => {
     const recs = [
-      rec("a", 40, 10),
-      rec("a", 41, 0, { hasError: true, totalHours: 90 }),
+      rec("a", 2026, 9, 37, 10),
+      rec("a", 2026, 9, 38, 0, { hasError: true, totalHours: 90 }),
     ];
-    const [a] = computeEmployeeStatuses(emp, recs, period);
-    expect(a.monthlyOvertime).toBe(10);
-    expect(a.hasError).toBe(true);
-    expect(a.pendingReviewCount).toBe(1);
-    expect(a.potentialMonthlyOvertime).toBe(58);
-    expect(a.reasons.some((r) => r.includes("por revisar"))).toBe(true);
-    expect(a.reasons).not.toContain("Operación normal.");
+    const [a] = computeEmployeeStatuses(emp, recs, { year: 2026, month: 9, week: 38, cutoffDay: 20 });
+    expect(a).toMatchObject({ monthlyOvertime: 10, hasError: true, pendingReviewCount: 1, potentialMonthlyOvertime: 58 });
+    expect(a.reasons.some((r) => r.includes("entre 10,0h y 58,0h"))).toBe(true);
   });
 
-  it("un registro descartado ya no deja a la persona por revisar", () => {
+  it("CP-17: un registro descartado ya no deja a la persona por revisar", () => {
     const recs = [
-      rec("a", 40, 10),
-      rec("a", 41, 0, { hasError: true, totalHours: 90, reviewStatus: "descartado" }),
+      rec("a", 2026, 9, 37, 10),
+      rec("a", 2026, 9, 38, 0, { hasError: true, totalHours: 90, reviewStatus: "descartado" }),
     ];
-    const [a] = computeEmployeeStatuses(emp, recs, period);
-    expect(a.hasError).toBe(false);
-    expect(a.pendingReviewCount).toBe(0);
-    expect(a.monthlyOvertime).toBe(10);
+    const [a] = computeEmployeeStatuses(emp, recs, { year: 2026, month: 9, week: 38, cutoffDay: 20 });
+    expect(a).toMatchObject({ hasError: false, pendingReviewCount: 0, monthlyOvertime: 10 });
   });
 
-  it("registros de novedades: no se inventan totales en la ficha", () => {
-    const recs = [rec("a", 40, 6, { source: "novedades", totalHours: 0 })];
-    const statuses = computeEmployeeStatuses(emp, recs, period);
-    const d = buildEmployeeDetail(statuses[0], recs, statuses, period);
+  it("resumen: riesgo por meta y por proyección, semanas de más de 12h", () => {
+    const recs = [
+      rec("a", 2026, 9, 37, 13), rec("a", 2026, 9, 38, 13),
+      rec("b", 2026, 9, 37, 11), rec("b", 2026, 9, 38, 11), rec("b", 2026, 9, 36, 10),
+    ];
+    const statuses = computeEmployeeStatuses(emp, recs, { year: 2026, month: 9, week: 38, cutoffDay: 20 });
+    const s = summarize(statuses);
+    // a: 26h ≤ 34,3h; proyección 39h → Normal. b: 32h ≤ 34,3h; proyección 48h → Normal.
+    expect(s).toMatchObject({ green: 2, weeklyHigh: 2, weeklyHighPeople: 1 });
+  });
+
+  it("detalle: tramos con acumulado y meta; novedades sin totales inventados", () => {
+    const recs = [rec("a", 2026, 9, 36, 6, { source: "novedades", totalHours: 0 })];
+    const statuses = computeEmployeeStatuses(emp, recs, { year: 2026, month: 9, week: 36, cutoffDay: 6 });
+    const d = buildEmployeeDetail(statuses[0], recs, statuses, { year: 2026, month: 9, week: 36, cutoffDay: 6 });
     expect(d.totalHoursMonth).toBeNull();
-    expect(d.baseHoursMonth).toBeNull();
-    expect(d.history[0].totalHours).toBeNull();
-    expect(d.history[0].monthToDate).toBe(6);
-    expect(d.extraHoursMonth).toBe(6);
+    expect(d.history[0]).toMatchObject({ totalHours: null, monthToDate: 6, label: "1 al 6 de septiembre (6 días)" });
+    expect(d.segments.map((x) => x.short)).toEqual(["1–6 sep", "7–13 sep", "14–20 sep", "21–27 sep", "28–30 sep"]);
+    expect(d.segments[0]).toMatchObject({ hours: 6, cumulative: 6, future: false, weekShared: true });
+    expect(d.segments[1].future).toBe(true);
+    expect(d.segments.map((x) => Math.round(x.target * 10) / 10)).toEqual([10.3, 22.3, 34.3, 46.3, 48]);
   });
 });

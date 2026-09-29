@@ -6,7 +6,7 @@
 
 import Papa from "papaparse";
 import type { BiometricRow } from "./types";
-import { weekInfo } from "./dates";
+import { isoDate, segmentOfDate, weekInfo, type CivilDate } from "./dates";
 
 export interface ParsedCsv {
   rows: BiometricRow[];
@@ -148,9 +148,13 @@ export interface OvertimeWeekly {
   costCenter?: string;
   plant?: string;
   managerName?: string;
+  /** Año y mes calendario del tramo. */
   year: number;
-  week: number;
   month: number;
+  /** Semana ISO del tramo. */
+  week: number;
+  /** Último día con eventos en el tramo (`yyyy-mm-dd`). */
+  lastDate: string;
   overtimeHours: number;
   byConcepto: Record<RecargoKey, number>;
 }
@@ -206,21 +210,18 @@ export function areaFromCeco(ceco: string): string {
   return (dash >= 0 ? s.slice(dash + 1) : s).trim();
 }
 
-function parseIdFecha(v: string): Date | null {
+function parseIdFecha(v: string): CivilDate | null {
   const s = String(v ?? "").trim();
-  if (/^\d{8}$/.test(s)) {
-    return new Date(
-      Number(s.slice(0, 4)),
-      Number(s.slice(4, 6)) - 1,
-      Number(s.slice(6, 8))
-    );
-  }
-  return null;
+  if (!/^\d{8}$/.test(s)) return null;
+  const c = { y: Number(s.slice(0, 4)), m: Number(s.slice(4, 6)), d: Number(s.slice(6, 8)) };
+  const back = new Date(Date.UTC(c.y, c.m - 1, c.d));
+  return back.getUTCMonth() + 1 === c.m && back.getUTCDate() === c.d ? c : null;
 }
 
 /**
- * Parsea el export real de horas extra y agrega por empleado y semana ISO,
- * con el desglose por recargo.
+ * Parsea el export real de horas extra y agrega por empleado y TRAMO (semana
+ * ISO dentro del mes calendario), con el desglose por recargo. Cada evento va
+ * al tramo de su fecha, así que una semana que cruza de mes se parte exacta.
  */
 export function parseOvertimeEventsCsv(content: string): {
   rows: OvertimeWeekly[];
@@ -248,8 +249,10 @@ export function parseOvertimeEventsCsv(content: string): {
     const hours = toNum(cols[COL.tiempoH]);
     if (hours <= 0) return;
 
-    const { year, week, month } = isoWeekInfo(date);
-    const key = `${code}|${year}|${week}`;
+    const seg = segmentOfDate(date);
+    const { year, month, week } = seg;
+    const day = isoDate(date);
+    const key = `${code}|${year}|${month}|${week}`;
     let rec = map.get(key);
     if (!rec) {
       const ceco = String(cols[COL.ceco] ?? "").trim();
@@ -262,13 +265,15 @@ export function parseOvertimeEventsCsv(content: string): {
         plant: String(cols[COL.division] ?? "").trim() || undefined,
         managerName: String(cols[COL.jefe] ?? "").trim() || undefined,
         year,
-        week,
         month,
+        week,
+        lastDate: day,
         overtimeHours: 0,
         byConcepto: { diurna: 0, nocturna: 0, dom_diurna: 0, dom_nocturna: 0 },
       };
       map.set(key, rec);
     }
+    if (day > rec.lastDate) rec.lastDate = day;
     rec.overtimeHours = round2Local(rec.overtimeHours + hours);
     const k = classifyConcepto(String(cols[COL.concepto] ?? ""));
     rec.byConcepto[k] = round2Local(rec.byConcepto[k] + hours);

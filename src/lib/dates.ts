@@ -1,15 +1,17 @@
 // Calendario del negocio: UNA sola definición de fechas para toda la app.
 //
-// Reglas:
+// Reglas (requerimientos v2):
 //  - La fecha de "hoy" es la de la planta (America/Bogota), no la del
 //    servidor: Vercel corre en UTC y desde las 19:00 de Colombia ya sería
 //    el día siguiente.
-//  - Las semanas son ISO (lunes a domingo).
-//  - Cada semana se imputa al mes de su JUEVES (la misma regla que usa la
-//    carga del biométrico). Así una semana nunca se parte entre dos meses y
-//    cada mes tiene 4 o 5 semanas completas.
-//  - El año de un periodo es el año del jueves (= año ISO de la semana =
-//    año del mes de imputación), por lo que semana, mes y año son coherentes.
+//  - El mes de análisis es el mes CALENDARIO (del 1 al último día).
+//  - Un TRAMO es la parte de una semana lunes–domingo que cae dentro del mes.
+//    Un mes tiene de 4 a 6 tramos; el primero y el último pueden ser parciales.
+//  - Los tramos se muestran por sus fechas («1 al 6 de septiembre»), nunca por
+//    el número de semana.
+//  - La alerta de 12h se mide sobre la semana completa (lunes a domingo). Una
+//    semana que cruza de mes se cuenta en el mes donde tiene más días (el de
+//    su jueves).
 
 export const PLANT_TZ = "America/Bogota";
 
@@ -21,19 +23,33 @@ export interface CivilDate {
 }
 
 export interface WeekInfo {
-  /** Año ISO de la semana (= año del jueves = año del mes de imputación). */
+  /** Año ISO de la semana (= año de su jueves). */
   year: number;
   /** Semana ISO (1–53). */
   week: number;
-  /** Mes de imputación (1–12): el mes en que cae el jueves de la semana. */
+  /** Mes del jueves: el mes donde la semana tiene más días. */
   month: number;
 }
 
-export interface MonthWeek extends WeekInfo {
-  /** Lunes de la semana. */
+/** Tramo: parte de una semana ISO dentro de un mes calendario. */
+export interface Segment {
+  /** Año y mes calendario del tramo. */
+  year: number;
+  month: number;
+  /** Año y número de la semana ISO a la que pertenece. */
+  isoYear: number;
+  week: number;
+  /** Clave estable «2026-09-w37». */
+  key: string;
   start: CivilDate;
-  /** Domingo de la semana. */
   end: CivilDate;
+  /** Días del tramo dentro del mes (1–7). */
+  days: number;
+  partial: boolean;
+  /** «1 al 6 de septiembre (6 días)». */
+  label: string;
+  /** «1–6 sep». */
+  short: string;
 }
 
 const DAY_MS = 86_400_000;
@@ -46,7 +62,7 @@ function fromUTC(d: Date): CivilDate {
   return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate() };
 }
 
-function addDays(c: CivilDate, n: number): CivilDate {
+export function addDays(c: CivilDate, n: number): CivilDate {
   return fromUTC(new Date(toUTC(c).getTime() + n * DAY_MS));
 }
 
@@ -86,17 +102,25 @@ export function isoWeekday(c: CivilDate): number {
   return toUTC(c).getUTCDay() || 7;
 }
 
-/** Jueves de la semana ISO que contiene la fecha. */
-function thursdayOf(c: CivilDate): CivilDate {
-  return addDays(c, 4 - isoWeekday(c));
+/** Días que tiene un mes calendario. */
+export function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
-/** Semana ISO de una fecha y el mes al que se imputa (mes del jueves). */
+/** Semana ISO de una fecha y el mes de su jueves. */
 export function weekInfo(c: CivilDate): WeekInfo {
-  const thu = thursdayOf(c);
+  const thu = addDays(c, 4 - isoWeekday(c));
   const yearStart = toUTC({ y: thu.y, m: 1, d: 1 }).getTime();
   const week = Math.ceil(((toUTC(thu).getTime() - yearStart) / DAY_MS + 1) / 7);
   return { year: thu.y, week, month: thu.m };
+}
+
+/** Lunes de una semana ISO. */
+export function isoWeekMonday(isoYear: number, week: number): CivilDate {
+  // El 4 de enero siempre está en la semana 1.
+  const jan4: CivilDate = { y: isoYear, m: 1, d: 4 };
+  const monday1 = addDays(jan4, 1 - isoWeekday(jan4));
+  return addDays(monday1, (week - 1) * 7);
 }
 
 /** Los 7 días (lunes a domingo) de la semana ISO que contiene la fecha. */
@@ -105,140 +129,193 @@ export function weekDays(c: CivilDate): CivilDate[] {
   return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 }
 
-/**
- * Semanas ISO imputadas a un mes: las que tienen su jueves dentro del mes.
- * Siempre son 4 o 5, completas y consecutivas.
- */
-export function weeksOfMonth(year: number, month: number): MonthWeek[] {
-  const out: MonthWeek[] = [];
-  // Primer jueves del mes.
-  let thu: CivilDate = { y: year, m: month, d: 1 };
-  while (isoWeekday(thu) !== 4) thu = addDays(thu, 1);
-  while (thu.m === month) {
-    const info = weekInfo(thu);
-    out.push({ ...info, start: addDays(thu, -3), end: addDays(thu, 3) });
-    thu = addDays(thu, 7);
-  }
-  return out;
-}
-
-export type MonthStatus = "abierto" | "cerrado" | "futuro";
-
-/** Estado de un mes frente a hoy: cerrado si ya terminaron todas sus semanas. */
-export function monthStatus(year: number, month: number, today: CivilDate): MonthStatus {
-  const weeks = weeksOfMonth(year, month);
-  if (compareDates(weeks[weeks.length - 1].end, today) < 0) return "cerrado";
-  if (compareDates(weeks[0].start, today) > 0) return "futuro";
-  return "abierto";
-}
-
-export interface PeriodInfo extends WeekInfo {
-  status: MonthStatus;
-  /** Semanas que tiene el mes (4 o 5). */
-  weeksInMonth: number;
-  /** Lunes y domingo de la semana de referencia. */
-  weekStart: CivilDate;
-  weekEnd: CivilDate;
-}
-
-function toPeriodInfo(ref: MonthWeek, status: MonthStatus, weeksInMonth: number): PeriodInfo {
-  return {
-    year: ref.year,
-    week: ref.week,
-    month: ref.month,
-    status,
-    weeksInMonth,
-    weekStart: ref.start,
-    weekEnd: ref.end,
-  };
-}
-
-/**
- * Periodo actual: la semana ISO en curso (hora de la planta) y el mes al que
- * se imputa. Ojo: los últimos días de un mes pueden pertenecer ya al
- * siguiente (p. ej. el 29-sep-2026 está en la semana 40, que es de octubre).
- */
-export function currentPeriodInfo(now: Date = new Date()): PeriodInfo {
-  const today = todayInPlant(now);
-  const info = weekInfo(today);
-  const weeks = weeksOfMonth(info.year, info.month);
-  const ref = weeks.find((w) => w.week === info.week) ?? weeks[0];
-  return toPeriodInfo(ref, "abierto", weeks.length);
-}
-
-/**
- * Periodo para un mes elegido. Semana de referencia: la actual si el mes está
- * abierto, la última si está cerrado y la primera si es futuro.
- */
-export function periodForMonth(year: number, month: number, now: Date = new Date()): PeriodInfo {
-  const cur = currentPeriodInfo(now);
-  if (cur.year === year && cur.month === month) return cur;
-  const weeks = weeksOfMonth(year, month);
-  const status = monthStatus(year, month, todayInPlant(now));
-  const ref = status === "futuro" ? weeks[0] : weeks[weeks.length - 1];
-  return toPeriodInfo(ref, status, weeks.length);
-}
-
-/**
- * Cuántas semanas del mes ya tienen datos cargados: todas las semanas del mes
- * hasta la última que aparece en los registros. Una persona sin registro en
- * una semana cubierta hizo 0 horas extra esa semana (el archivo real solo trae
- * eventos), por eso la cobertura es del conjunto y no de cada persona.
- */
-export function coveredWeeks(
-  records: { year: number; month: number; week: number }[],
-  year: number,
-  month: number
-): number {
-  const weeks = weeksOfMonth(year, month);
-  const inMonth = records.filter((r) => r.year === year && r.month === month);
-  if (inMonth.length === 0) return 0;
-  const last = Math.max(...inMonth.map((r) => r.week));
-  return weeks.filter((w) => w.week <= last).length;
-}
-
-const MES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-
-/** «28 sep – 4 oct» para mostrar el rango de una semana. */
-export function formatWeekRange(start: CivilDate, end: CivilDate): string {
-  const a = `${start.d} ${MES_CORTO[start.m - 1]}`;
-  const b = `${end.d} ${MES_CORTO[end.m - 1]}`;
-  return `${a} – ${b}`;
-}
-
 export const MONTHS = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
   "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ];
 
+const MES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/** «Septiembre 2026». */
+export function monthLabel(year: number, month: number): string {
+  const m = MONTHS[month - 1];
+  return `${m.charAt(0).toUpperCase()}${m.slice(1)} ${year}`;
+}
+
+/** «20 de septiembre». */
+export function formatDayLong(c: CivilDate): string {
+  return `${c.d} de ${MONTHS[c.m - 1]}`;
+}
+
+/** «20 sep». */
+export function formatDayShort(c: CivilDate): string {
+  return `${c.d} ${MES_CORTO[c.m - 1]}`;
+}
+
+/** Clave estable de un tramo. */
+export function segmentKey(year: number, month: number, week: number): string {
+  return `${year}-${String(month).padStart(2, "0")}-w${week}`;
+}
+
+function buildSegment(year: number, month: number, start: CivilDate, end: CivilDate): Segment {
+  const w = weekInfo(start);
+  const days = end.d - start.d + 1;
+  const partial = days < 7;
+  const range = start.d === end.d ? `${start.d}` : `${start.d} al ${end.d}`;
+  return {
+    year,
+    month,
+    isoYear: w.year,
+    week: w.week,
+    key: segmentKey(year, month, w.week),
+    start,
+    end,
+    days,
+    partial,
+    label:
+      `${range} de ${MONTHS[month - 1]}` +
+      (partial ? ` (${days} día${days === 1 ? "" : "s"})` : ""),
+    short:
+      start.d === end.d
+        ? `${start.d} ${MES_CORTO[month - 1]}`
+        : `${start.d}–${end.d} ${MES_CORTO[month - 1]}`,
+  };
+}
+
+/** Tramos de un mes calendario, en orden. */
+export function monthSegments(year: number, month: number): Segment[] {
+  const last = daysInMonth(year, month);
+  const out: Segment[] = [];
+  let start: CivilDate = { y: year, m: month, d: 1 };
+  while (start.d <= last && start.m === month) {
+    const toSunday = 7 - isoWeekday(start);
+    const endDay = Math.min(last, start.d + toSunday);
+    const end: CivilDate = { y: year, m: month, d: endDay };
+    out.push(buildSegment(year, month, start, end));
+    if (endDay === last) break;
+    start = { y: year, m: month, d: endDay + 1 };
+  }
+  return out;
+}
+
+/** Tramo al que pertenece una fecha. */
+export function segmentOfDate(c: CivilDate): Segment {
+  const seg = monthSegments(c.y, c.m).find((s) => s.start.d <= c.d && c.d <= s.end.d);
+  // Siempre existe: los tramos cubren todo el mes.
+  return seg as Segment;
+}
+
+/** Tramo de un mes que pertenece a la semana ISO `week` (o undefined). */
+export function segmentOfWeek(year: number, month: number, week: number): Segment | undefined {
+  return monthSegments(year, month).find((s) => s.week === week);
+}
+
+/**
+ * Tramos de una semana ISO completa (uno si no cruza de mes, dos si cruza).
+ */
+export function weekSegments(isoYear: number, week: number): Segment[] {
+  const monday = isoWeekMonday(isoYear, week);
+  const sunday = addDays(monday, 6);
+  const a = segmentOfDate(monday);
+  if (sunday.m === monday.m) return [a];
+  return [a, segmentOfDate(sunday)];
+}
+
+/** «28 sep al 4 oct» o «7 al 13 sep» para una semana ISO completa. */
+export function formatWeekLabel(isoYear: number, week: number): string {
+  const monday = isoWeekMonday(isoYear, week);
+  const sunday = addDays(monday, 6);
+  if (monday.m === sunday.m) return `${monday.d} al ${sunday.d} ${MES_CORTO[monday.m - 1]}`;
+  return `${formatDayShort(monday)} al ${formatDayShort(sunday)}`;
+}
+
+export type MonthStatus = "abierto" | "cerrado" | "futuro";
+
+/** Estado de un mes calendario frente a hoy. */
+export function monthStatus(year: number, month: number, today: CivilDate): MonthStatus {
+  const first: CivilDate = { y: year, m: month, d: 1 };
+  const last: CivilDate = { y: year, m: month, d: daysInMonth(year, month) };
+  if (compareDates(last, today) < 0) return "cerrado";
+  if (compareDates(first, today) > 0) return "futuro";
+  return "abierto";
+}
+
+export interface PeriodInfo {
+  year: number;
+  month: number;
+  status: MonthStatus;
+  daysInMonth: number;
+  /** Semana ISO del tramo de referencia (el de hoy, o el último del mes). */
+  week: number;
+  isoYear: number;
+}
+
+/** Periodo actual: el mes calendario de hoy en la planta. */
+export function currentPeriodInfo(now: Date = new Date()): PeriodInfo {
+  const today = todayInPlant(now);
+  const seg = segmentOfDate(today);
+  return {
+    year: today.y,
+    month: today.m,
+    status: "abierto",
+    daysInMonth: daysInMonth(today.y, today.m),
+    week: seg.week,
+    isoYear: seg.isoYear,
+  };
+}
+
+/** Periodo para un mes elegido. */
+export function periodForMonth(year: number, month: number, now: Date = new Date()): PeriodInfo {
+  const today = todayInPlant(now);
+  if (today.y === year && today.m === month) return currentPeriodInfo(now);
+  const segs = monthSegments(year, month);
+  const status = monthStatus(year, month, today);
+  const ref = status === "futuro" ? segs[0] : segs[segs.length - 1];
+  return {
+    year,
+    month,
+    status,
+    daysInMonth: daysInMonth(year, month),
+    week: ref.week,
+    isoYear: ref.isoYear,
+  };
+}
+
+/** Datos mínimos de un registro para calcular la fecha de corte. */
+export interface CoverageRecord {
+  year: number;
+  month: number;
+  week: number;
+  /** Último día con datos del tramo (`yyyy-mm-dd`), si se conoce. */
+  lastDate?: string;
+}
+
+/**
+ * Fecha de corte del mes: el último día con datos cargados (RF-04). Es el
+ * mayor `lastDate` de los registros del mes o, si no lo traen, el final de su
+ * tramo. Nunca pasa de hoy. Devuelve el día del mes (0 = sin datos).
+ */
+export function cutoffDay(
+  records: CoverageRecord[],
+  year: number,
+  month: number,
+  today: CivilDate
+): number {
+  const segs = monthSegments(year, month);
+  let best = 0;
+  for (const r of records) {
+    if (r.year !== year || r.month !== month) continue;
+    const last = r.lastDate ? parseIsoDate(r.lastDate) : null;
+    let day =
+      last && last.y === year && last.m === month
+        ? last.d
+        : segs.find((s) => s.week === r.week)?.end.d ?? 0;
+    if (day > best) best = day;
+  }
+  if (best === 0) return 0;
+  if (today.y === year && today.m === month) best = Math.min(best, today.d);
+  return best;
+}
+
 /** Iniciales de lunes a domingo. */
 export const DOW = ["L", "M", "M", "J", "V", "S", "D"];
-
-export interface PlantWeekDay {
-  /** Fecha ISO `yyyy-mm-dd`. */
-  date: string;
-  /** Inicial del día (L, M, M, J, V, S, D). */
-  dow: string;
-  /** Día del mes. */
-  day: number;
-  isToday: boolean;
-}
-
-/** Los 7 días de la semana en curso en la planta (para el calendario de solicitudes). */
-export function plantWeekDays(now: Date = new Date()): PlantWeekDay[] {
-  const today = todayInPlant(now);
-  return weekDays(today).map((c, i) => ({
-    date: isoDate(c),
-    dow: DOW[i],
-    day: c.d,
-    isToday: compareDates(c, today) === 0,
-  }));
-}
-
-/** «J 1/10» a partir de `yyyy-mm-dd` (o null si no es una fecha válida). */
-export function formatShortDay(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const c = parseIsoDate(iso);
-  if (!c) return null;
-  return `${DOW[isoWeekday(c) - 1]} ${c.d}/${c.m}`;
-}

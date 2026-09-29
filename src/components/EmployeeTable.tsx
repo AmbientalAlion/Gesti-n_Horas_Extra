@@ -5,12 +5,12 @@ import { StatusBadge } from "./StatusBadge";
 import { EmployeeLink } from "./drawer/EmployeeLink";
 import { useDrawer } from "./drawer/context";
 import type { EmployeeStatus } from "@/lib/aggregate";
-import { RULES } from "@/lib/overtime";
+import { fmtH, RULES } from "@/lib/overtime";
 
-/** Color de la cifra mensual según cuán cerca está del límite legal. */
-function monthlyClass(v: number): string {
-  if (v > RULES.MONTHLY_OVERTIME_LIMIT) return "font-semibold text-status-red";
-  if (v >= RULES.MONTHLY_OVERTIME_WARNING) return "font-semibold text-status-yellow";
+/** Color del acumulado: rojo sobre 48h, naranja sobre la meta a la fecha. */
+function accClass(r: EmployeeStatus): string {
+  if (r.level === "red") return "font-semibold text-status-red";
+  if (r.risk === "meta") return "font-semibold text-status-yellow";
   return "text-slate-700";
 }
 
@@ -32,9 +32,7 @@ export function EmployeeTable({
   const openRow = (id: string) => drawer?.open({ kind: "employee", id });
   const linkFor = (id: string) => {
     if (!hrefBase) return undefined;
-    const qs = [query, roleParam ? `rol=${roleParam}` : ""]
-      .filter(Boolean)
-      .join("&");
+    const qs = [query, roleParam ? `rol=${roleParam}` : ""].filter(Boolean).join("&");
     return `${hrefBase}/${id}${qs ? `?${qs}` : ""}`;
   };
 
@@ -43,16 +41,25 @@ export function EmployeeTable({
       <div className="card text-center">
         <p className="text-sm font-medium text-brand-dark">Sin resultados</p>
         <p className="mt-1 text-sm text-slate-600">
-          Ninguna persona coincide con los filtros de este periodo. Quite algún
-          filtro para ampliar la búsqueda.
+          Ninguna persona coincide con los filtros de este periodo. Quite algún filtro para
+          ampliar la búsqueda.
         </p>
       </div>
     );
   }
 
+  const name = (r: EmployeeStatus, cls: string) =>
+    linkFor(r.id) ? (
+      <EmployeeLink id={r.id} href={linkFor(r.id)} className={cls}>
+        {r.name ?? r.code}
+      </EmployeeLink>
+    ) : (
+      <span className={cls}>{r.name ?? r.code}</span>
+    );
+
   return (
     <div className="card overflow-hidden p-0 sm:overflow-x-auto">
-      {/* Teléfono: una tarjeta por persona (la tabla de 8 columnas no cabe). */}
+      {/* Teléfono: una tarjeta por persona. */}
       <ul className="divide-y divide-slate-100 sm:hidden">
         {rows.map((r) => (
           <li
@@ -62,19 +69,7 @@ export function EmployeeTable({
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                {linkFor(r.id) ? (
-                  <EmployeeLink
-                    id={r.id}
-                    href={linkFor(r.id)}
-                    className="block truncate font-medium text-brand-dark underline-offset-2 hover:underline"
-                  >
-                    {r.name ?? r.code}
-                  </EmployeeLink>
-                ) : (
-                  <span className="block truncate font-medium text-slate-900">
-                    {r.name ?? r.code}
-                  </span>
-                )}
+                {name(r, "block truncate font-medium text-brand-dark underline-offset-2 hover:underline")}
                 <span className="block truncate text-[13px] text-slate-600">
                   {r.code}
                   {r.area ? ` · ${r.area}` : ""}
@@ -82,35 +77,24 @@ export function EmployeeTable({
               </div>
               <StatusBadge level={r.level} pending={r.pendingReviewCount} />
             </div>
-
-            {r.hasError && (
-              <p className="mt-1.5 text-[13px] font-medium text-violet-700">
-                {r.pendingReviewCount > 1 ? `${r.pendingReviewCount} registros por revisar` : "Registro por revisar"} (horas huérfanas)
-              </p>
-            )}
-
             <dl className="mt-2.5 grid grid-cols-3 gap-2 text-center">
               <div>
-                <dt className="text-xs text-slate-500">Mes</dt>
-                <dd className={clsx("text-sm tabular-nums", monthlyClass(r.monthlyOvertime))}>
-                  {r.monthlyOvertime.toFixed(1)}h
-                </dd>
+                <dt className="text-xs text-slate-500">Acumulado</dt>
+                <dd className={clsx("text-sm tabular-nums", accClass(r))}>{fmtH(r.monthlyOvertime)}</dd>
               </div>
               <div>
-                <dt className="text-xs text-slate-500">Le quedan</dt>
-                <dd className="text-sm font-semibold tabular-nums text-slate-700">
-                  {r.availableMonthly.toFixed(1)}h
-                </dd>
+                <dt className="text-xs text-slate-500">Meta a la fecha</dt>
+                <dd className="text-sm tabular-nums text-slate-700">{fmtH(r.target)}</dd>
               </div>
               <div>
                 <dt className="text-xs text-slate-500">Proyección</dt>
                 <dd
                   className={clsx(
                     "text-sm font-semibold tabular-nums",
-                    r.willExceedMonthly ? "text-status-red" : "text-slate-700"
+                    r.willExceedMonthly ? "text-status-yellow" : "text-slate-700"
                   )}
                 >
-                  ≈{r.projectedMonthlyOvertime.toFixed(0)}h
+                  ≈{fmtH(r.projectedMonthlyOvertime)}
                 </dd>
               </div>
             </dl>
@@ -118,18 +102,18 @@ export function EmployeeTable({
         ))}
       </ul>
 
-      {/* Escritorio: tabla completa. */}
+      {/* Escritorio: el estado va primero para que siempre se vea. */}
       <table className="hidden min-w-full divide-y divide-slate-200 text-sm sm:table">
         <thead className="bg-slate-50">
           <tr>
-            <th className="th">Empleado</th>
-            <th className="th">Área</th>
-            <th className="th">Jefe</th>
-            <th className="th-num">Extra esta semana</th>
-            <th className="th-num">Extra del mes</th>
-            <th className="th-num">Le quedan este mes</th>
-            <th className="th-num">Proyección de cierre</th>
-            <th className="th">Estado</th>
+            <th scope="col" className="th">Estado</th>
+            <th scope="col" className="th">Persona</th>
+            <th scope="col" className="th">Área · Jefe</th>
+            <th scope="col" className="th-num">Acumulado</th>
+            <th scope="col" className="th-num">Meta a la fecha</th>
+            <th scope="col" className="th-num">Sobre la meta</th>
+            <th scope="col" className="th-num">Sem. &gt; {RULES.WEEKLY_OVERTIME_LIMIT}h</th>
+            <th scope="col" className="th-num">Proyección</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -140,68 +124,46 @@ export function EmployeeTable({
               className={clsx("transition-colors hover:bg-slate-50", drawer && "cursor-pointer")}
             >
               <td className="px-4 py-3.5">
-                {linkFor(r.id) ? (
-                  <EmployeeLink
-                    id={r.id}
-                    href={linkFor(r.id)}
-                    className="font-medium text-brand-dark underline-offset-2 hover:underline"
-                  >
-                    {r.name ?? r.code}
-                  </EmployeeLink>
-                ) : (
-                  <div className="font-medium text-slate-900">{r.name ?? r.code}</div>
-                )}
+                <StatusBadge level={r.level} pending={r.pendingReviewCount} />
+              </td>
+              <td className="min-w-[11rem] px-4 py-3.5">
+                {name(r, "font-medium text-brand-dark underline-offset-2 hover:underline")}
                 <div className="text-[13px] text-slate-600">
                   {r.code}
                   {r.roleTitle ? ` · ${r.roleTitle}` : ""}
                 </div>
-                {r.hasError && (
-                  <div className="mt-1 text-[13px] font-medium text-violet-700">
-                    {r.pendingReviewCount > 1 ? `${r.pendingReviewCount} registros por revisar` : "Registro por revisar"} (horas huérfanas)
-                  </div>
-                )}
               </td>
               <td className="px-4 py-3.5 text-slate-600">
-                <span className="block max-w-[14rem] truncate" title={r.area ?? "—"}>
+                <span className="block max-w-[12rem] truncate" title={r.area ?? "—"}>
                   {r.area ?? "—"}
                 </span>
-              </td>
-              <td className="px-4 py-3.5 text-slate-600">
-                <span className="block max-w-[12rem] truncate" title={r.managerName ?? "—"}>
+                <span className="block max-w-[14rem] truncate text-[13px] text-slate-500" title={r.managerName ?? "—"}>
                   {r.managerName ?? "—"}
                 </span>
               </td>
-              <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums">
-                <span className="text-slate-700">{r.weeklyOvertime.toFixed(1)}h</span>
-                {r.weeklyHigh && (
-                  <span
-                    className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600"
-                    title="Semana por encima de 12h. Está permitido: el límite que cuenta es el mensual."
-                  >
-                    alta
-                  </span>
-                )}
+              <td className={clsx("whitespace-nowrap px-4 py-3.5 text-right tabular-nums", accClass(r))}>
+                {fmtH(r.monthlyOvertime)}
+              </td>
+              <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-600">
+                {fmtH(r.target)}
               </td>
               <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums">
-                <span className={monthlyClass(r.monthlyOvertime)}>
-                  {r.monthlyOvertime.toFixed(1)}h
-                </span>
+                {r.overTarget > 0 ? (
+                  <span className="font-semibold text-status-yellow">+{fmtH(r.overTarget)}</span>
+                ) : (
+                  <span className="text-slate-400">—</span>
+                )}
               </td>
               <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-700">
-                {r.availableMonthly.toFixed(1)}h
+                {r.highWeeksMonth > 0 ? r.highWeeksMonth : <span className="text-slate-400">—</span>}
               </td>
-              <td className="whitespace-nowrap px-4 py-3.5 text-right text-sm tabular-nums">
-                <span className={r.willExceedMonthly ? "font-semibold text-status-red" : "text-slate-700"}>
-                  ≈{r.projectedMonthlyOvertime.toFixed(0)}h
+              <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums">
+                <span className={r.willExceedMonthly ? "font-semibold text-status-yellow" : "text-slate-700"}>
+                  ≈{fmtH(r.projectedMonthlyOvertime)}
                 </span>
-                {r.willExceedMonthly && (
-                  <span className="block text-xs font-medium text-status-red">
-                    excede 48h
-                  </span>
+                {r.risk === "proyeccion" && (
+                  <span className="block text-xs font-medium text-status-yellow">pasaría de 48h</span>
                 )}
-              </td>
-              <td className="px-4 py-3.5">
-                <StatusBadge level={r.level} pending={r.pendingReviewCount} />
               </td>
             </tr>
           ))}

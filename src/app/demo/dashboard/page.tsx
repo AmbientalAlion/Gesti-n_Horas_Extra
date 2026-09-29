@@ -7,9 +7,9 @@ import type { Role } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 const ROLE_LABEL: Record<Role, string> = {
-  rrhh: "Recursos Humanos — planta completa",
-  director: "Director General — planta completa",
-  jefe: "Jefe Inmediato — solo su equipo",
+  rrhh: "Recursos Humanos · toda la organización",
+  director: "Director · Dirección Industrial",
+  jefe: "Jefe inmediato · su equipo directo",
 };
 
 export default function DemoDashboard({

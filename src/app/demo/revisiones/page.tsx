@@ -1,11 +1,8 @@
+import { segmentOfWeek } from "@/lib/dates";
 import { demoEmployees, demoRecords } from "@/lib/demo";
 
 export const dynamic = "force-dynamic";
 
-const MONTHS = [
-  "ene", "feb", "mar", "abr", "may", "jun",
-  "jul", "ago", "sep", "oct", "nov", "dic",
-];
 
 export default function DemoRevisiones() {
   const nameOf = new Map(demoEmployees.map((e) => [e.id, e]));
@@ -39,7 +36,7 @@ export default function DemoRevisiones() {
                   {emp?.name ?? r.employeeId} · {emp?.area ?? "—"}
                 </div>
                 <div className="text-xs text-slate-500">
-                  Semana {r.week} · {MONTHS[r.month - 1]} {r.year} · Total{" "}
+                  {segmentOfWeek(r.year, r.month, r.week)?.label ?? `Semana ${r.week}`} {r.year} · Total{" "}
                   {r.totalHours.toFixed(1)}h · Turno máx{" "}
                   {r.maxShiftHours != null ? `${r.maxShiftHours.toFixed(1)}h` : "—"}
                 </div>

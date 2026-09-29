@@ -157,7 +157,7 @@ export function EmployeeSearch({
                     </span>
                     <span className="shrink-0 text-right text-xs">
                       <span className="block font-semibold tabular-nums text-brand-dark">
-                        {r.monthlyOvertime.toFixed(0)}h
+                        {r.monthlyOvertime.toFixed(1).replace(".", ",")}h
                       </span>
                       <span className="block text-[10px] text-slate-500">mes</span>
                     </span>

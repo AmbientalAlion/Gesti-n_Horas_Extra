@@ -5,16 +5,16 @@ import Link from "next/link";
 import clsx from "clsx";
 import { useDrawer, type Segment } from "./drawer/context";
 import { segmentMembers } from "./drawer/select";
-import { RULES } from "@/lib/overtime";
+import { fmtH, RULES } from "@/lib/overtime";
 import type { EmployeeStatus } from "@/lib/aggregate";
 
-type Tab = "red" | "yellow" | "errors";
+type Tab = "red" | "yellow" | "weeklyHigh" | "errors";
 
 const TABS: {
   key: Tab;
   label: string;
-  /** Forma singular para «1 crítica», «1 preventiva». */
-  one: string;
+  /** Texto de la etiqueta de conteo: «2 excedidos», «1 en riesgo». */
+  count: (n: number) => string;
   empty: string;
   accent: string;
   pill: string;
@@ -22,26 +22,35 @@ const TABS: {
 }[] = [
   {
     key: "red",
-    label: "Críticas",
-    one: "crítica",
-    empty: "Nadie superó las 48 horas extra del mes.",
+    label: "Excedidos",
+    count: (n) => `${n} excedido${n === 1 ? "" : "s"}`,
+    empty: `Nadie superó las ${RULES.MONTHLY_OVERTIME_LIMIT} horas extra del mes.`,
     accent: "border-l-status-red",
     pill: "bg-red-100 text-red-800",
     dot: "bg-status-red",
   },
   {
     key: "yellow",
-    label: "Preventivas",
-    one: "preventiva",
-    empty: "Nadie está cerca del límite mensual.",
+    label: "En riesgo",
+    count: (n) => `${n} en riesgo`,
+    empty: "Nadie va por encima de la meta ni proyecta superar el límite.",
     accent: "border-l-status-yellow",
     pill: "bg-amber-100 text-amber-800",
     dot: "bg-status-yellow",
   },
   {
+    key: "weeklyHigh",
+    label: `Semanas > ${RULES.WEEKLY_OVERTIME_LIMIT}h`,
+    count: (n) => `${n} con semana > ${RULES.WEEKLY_OVERTIME_LIMIT}h`,
+    empty: `Nadie pasó de ${RULES.WEEKLY_OVERTIME_LIMIT}h en una semana este mes.`,
+    accent: "border-l-slate-400",
+    pill: "bg-slate-100 text-slate-700",
+    dot: "bg-slate-500",
+  },
+  {
     key: "errors",
     label: "Por revisar",
-    one: "por revisar",
+    count: (n) => `${n} por revisar`,
     empty: "No hay registros congelados por horas huérfanas.",
     accent: "border-l-violet-500",
     pill: "bg-violet-100 text-violet-800",
@@ -58,12 +67,14 @@ function AlertItem({
   open,
   onToggle,
   delay = 0,
+  reviewHref,
 }: {
   s: EmployeeStatus;
   tab: (typeof TABS)[number];
   open: boolean;
   onToggle: () => void;
   delay?: number;
+  reviewHref?: string;
 }) {
   const drawer = useDrawer();
   const bodyId = useId();
@@ -72,14 +83,23 @@ function AlertItem({
     bodyRef.current?.toggleAttribute("inert", !open);
   }, [open]);
 
-  const pct = Math.min(100, (s.monthlyOvertime / RULES.MONTHLY_OVERTIME_LIMIT) * 100);
   const reasons =
     tab.key === "errors"
       ? [
-          "Tiene un turno de más de 16 horas sin marcación de salida.",
-          "El registro está congelado: no suma al acumulado hasta que Recursos Humanos lo revise.",
+          `Tiene ${s.pendingReviewCount} registro${s.pendingReviewCount === 1 ? "" : "s"} con un turno de más de ${RULES.ORPHAN_SHIFT_HOURS} horas sin marcación de salida.`,
+          "Está congelado: no suma al acumulado hasta que Recursos Humanos lo revise.",
         ]
-      : s.reasons.filter((r) => r !== "Operación normal.");
+      : tab.key === "weeklyHigh"
+        ? s.highWeeks.map((w) => `${w.label}: ${fmtH(w.hours)} (lunes a domingo${w.shared ? ", semana compartida con otro mes" : ""}).`)
+        : s.reasons;
+  const value =
+    tab.key === "yellow"
+      ? s.risk === "meta"
+        ? { main: `+${fmtH(s.overTarget)}`, sub: "sobre la meta" }
+        : { main: `≈${fmtH(s.projectedMonthlyOvertime)}`, sub: "al cierre" }
+      : tab.key === "weeklyHigh"
+        ? { main: String(s.highWeeksMonth || s.highWeeks.length), sub: `sem. > ${RULES.WEEKLY_OVERTIME_LIMIT}h` }
+        : { main: fmtH(s.monthlyOvertime), sub: "en el mes" };
 
   return (
     <li
@@ -107,12 +127,8 @@ function AlertItem({
           </span>
         </span>
         <span className="shrink-0 text-right">
-          <span className="block text-sm font-bold tabular-nums text-slate-900">
-            {s.monthlyOvertime.toFixed(1)}h
-          </span>
-          <span className="block text-[11px] text-slate-500">
-            de {RULES.MONTHLY_OVERTIME_LIMIT}h
-          </span>
+          <span className="block text-sm font-bold tabular-nums text-slate-900">{value.main}</span>
+          <span className="block text-[11px] text-slate-500">{value.sub}</span>
         </span>
         <span
           className={clsx(
@@ -136,18 +152,11 @@ function AlertItem({
       >
         <div className="min-h-0 overflow-hidden">
           <div className="space-y-3 border-t border-slate-200 px-3 py-3 sm:px-4">
-            <div>
-              <div className="mb-1 flex justify-between text-xs text-slate-600">
-                <span>Consumo del límite mensual</span>
-                <span className="tabular-nums">{pct.toFixed(0)}%</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-slate-200">
-                <div
-                  className={clsx("h-full rounded-full", tab.dot)}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-            </div>
+            <p className="text-xs text-slate-600">
+              Acumulado <strong className="tabular-nums text-slate-800">{fmtH(s.monthlyOvertime)}</strong>{" "}
+              · meta a la fecha <span className="tabular-nums">{fmtH(s.target)}</span> · límite{" "}
+              {RULES.MONTHLY_OVERTIME_LIMIT}h
+            </p>
 
             {reasons.length > 0 && (
               <ul className="space-y-1.5">
@@ -173,6 +182,11 @@ function AlertItem({
                   Abrir ficha
                 </Link>
               )}
+              {tab.key === "errors" && reviewHref && (
+                <Link href={reviewHref} className="btn-secondary text-sm">
+                  Ir a revisar
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -182,11 +196,17 @@ function AlertItem({
 }
 
 /**
- * Centro de alertas: en lugar de un párrafo, cada alerta es una fila
- * desplegable, agrupada en pestañas por tipo (críticas, preventivas y
- * registros por revisar).
+ * Centro de alertas: cada alerta es una fila desplegable, agrupada en cuatro
+ * pestañas (excedidos, en riesgo, semanas de más de 12h y por revisar).
  */
-export function AlertsCenter({ delay = 0 }: { delay?: number }) {
+export function AlertsCenter({
+  delay = 0,
+  reviewHref,
+}: {
+  delay?: number;
+  /** Enlace a la bandeja de registros por revisar (solo RRHH). */
+  reviewHref?: string;
+}) {
   const drawer = useDrawer();
   const statuses = drawer?.statuses;
 
@@ -195,10 +215,12 @@ export function AlertsCenter({ delay = 0 }: { delay?: number }) {
     return {
       red: segmentMembers(all, "red"),
       yellow: segmentMembers(all, "yellow"),
+      weeklyHigh: segmentMembers(all, "weeklyHigh"),
       errors: segmentMembers(all, "errors"),
     };
   }, [statuses]);
-  const total = lists.red.length + lists.yellow.length + lists.errors.length;
+  const total =
+    lists.red.length + lists.yellow.length + lists.weeklyHigh.length + lists.errors.length;
   const firstWithData = (TABS.find((t) => lists[t.key].length > 0)?.key ?? "red") as Tab;
 
   const [open, setOpen] = useState(total > 0);
@@ -224,8 +246,9 @@ export function AlertsCenter({ delay = 0 }: { delay?: number }) {
       >
         <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-status-green" aria-hidden />
         <p className="text-sm text-green-800">
-          <strong>Sin alertas.</strong> Todas las personas de la vista están dentro del
-          límite mensual y no hay registros por revisar.
+          <strong>Sin alertas.</strong> Todas las personas de la vista van dentro de la
+          meta, ninguna pasó de {RULES.WEEKLY_OVERTIME_LIMIT}h en una semana y no hay registros
+          por revisar.
         </p>
       </section>
     );
@@ -270,8 +293,7 @@ export function AlertsCenter({ delay = 0 }: { delay?: number }) {
                 key={t.key}
                 className={clsx("rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums", t.pill)}
               >
-                {lists[t.key].length}{" "}
-                {lists[t.key].length === 1 ? t.one : t.label.toLowerCase()}
+                {t.count(lists[t.key].length)}
               </span>
             ) : null
           )}
@@ -326,6 +348,7 @@ export function AlertsCenter({ delay = 0 }: { delay?: number }) {
                       s={s}
                       tab={current}
                       delay={i * 40}
+                      reviewHref={reviewHref}
                       open={expanded === s.id}
                       onToggle={() => setExpanded((e) => (e === s.id ? null : s.id))}
                     />
@@ -341,7 +364,7 @@ export function AlertsCenter({ delay = 0 }: { delay?: number }) {
                   }
                   className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-brand-dark underline underline-offset-2 hover:no-underline"
                 >
-                  Ver las {items.length} alertas {current.label.toLowerCase()} ›
+                  Ver la lista completa ({items.length}) ›
                 </button>
               )}
             </div>

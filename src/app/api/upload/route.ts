@@ -5,6 +5,10 @@ import {
   isOvertimeEventsCsv,
 } from "@/lib/csv";
 import { buildWeeklyRecord, round2 } from "@/lib/overtime";
+import { distribute, splitWeek } from "@/lib/ingest";
+import { formatDayLong, isoDate, isoWeekMonday, parseIsoDate } from "@/lib/dates";
+
+const isoMonday = (y: number, w: number) => isoDate(isoWeekMonday(y, w));
 import { getSessionProfile } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/demo";
 import { createClient } from "@/lib/supabase/server";
@@ -29,6 +33,57 @@ interface UploadResult {
   format: "eventos" | "legacy";
   errors: string[];
   preview: PreviewRow[];
+  /** Primer y último día con datos del archivo. */
+  range?: { from: string; to: string; label: string };
+  /** Tramos con horas repartidas por días (semana que cruza de mes sin detalle). */
+  estimatedSegments?: number;
+  /** Registros ya revisados que la carga no modificó (RF-24). */
+  skippedReviewed?: number;
+}
+
+type Supa = ReturnType<typeof createClient>;
+
+/** Rango legible «del 1 al 20 de septiembre». */
+function rangeOf(dates: string[]): UploadResult["range"] {
+  const sorted = dates.filter(Boolean).sort();
+  if (sorted.length === 0) return undefined;
+  const a = parseIsoDate(sorted[0]);
+  const b = parseIsoDate(sorted[sorted.length - 1]);
+  if (!a || !b) return undefined;
+  return {
+    from: sorted[0],
+    to: sorted[sorted.length - 1],
+    label:
+      a.m === b.m && a.y === b.y
+        ? `del ${a.d} al ${formatDayLong(b)}`
+        : `del ${formatDayLong(a)} al ${formatDayLong(b)}`,
+  };
+}
+
+/**
+ * Claves (empleado|año|mes|semana) de registros ya revisados o congelados: una
+ * recarga no los pisa, para no deshacer una corrección o un descarte (RF-24).
+ */
+async function protectedKeys(supabase: Supa, employeeIds: string[], months: { y: number; m: number }[]) {
+  const keys = new Set<string>();
+  if (employeeIds.length === 0 || months.length === 0) return keys;
+  const filter = months.map((x) => `and(year.eq.${x.y},month.eq.${x.m})`).join(",");
+  const { data, error } = await supabase
+    .from("weekly_records")
+    .select("employee_id, year, month, week, has_error, review_status")
+    .in("employee_id", employeeIds)
+    .or(filter);
+  if (error) throw new Error(`No se pudieron leer los registros existentes: ${error.message}`);
+  for (const r of data ?? []) {
+    if (r.review_status || r.has_error) keys.add(`${r.employee_id}|${r.year}|${r.month}|${r.week}`);
+  }
+  return keys;
+}
+
+function monthsOf(rows: { year: number; month: number }[]) {
+  const m = new Map<string, { y: number; m: number }>();
+  for (const r of rows) m.set(`${r.year}-${r.month}`, { y: r.year, m: r.month });
+  return [...m.values()];
 }
 
 export async function POST(request: Request) {
@@ -60,6 +115,7 @@ export async function POST(request: Request) {
       byEmp.set(r.code, e);
     }
     const preview = [...byEmp.values()];
+    const range = rangeOf(rows.map((r) => r.lastDate));
 
     const result: UploadResult = {
       processed: rows.length,
@@ -69,6 +125,8 @@ export async function POST(request: Request) {
       format: "eventos",
       errors,
       preview,
+      range,
+      estimatedSegments: 0,
     };
 
     if (demoOnly || !isSupabaseConfigured()) {
@@ -116,17 +174,32 @@ export async function POST(request: Request) {
       .in("code", [...empByCode.keys()]);
     const idByCode = new Map((employees ?? []).map((e) => [e.code, e.id]));
 
-    // 2. Registros semanales con desglose de recargos.
+    // 2. Registros por tramo con desglose de recargos. El archivo de novedades
+    //    no trae horas totales: no se inventan (total_hours = null).
+    let skipped: Set<string>;
+    try {
+      skipped = await protectedKeys(supabase, [...idByCode.values()], monthsOf(rows));
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    }
+    let skippedReviewed = 0;
     const recordUpserts = rows
       .map((r) => {
         const employeeId = idByCode.get(r.code);
         if (!employeeId) return null;
+        if (skipped.has(`${employeeId}|${r.year}|${r.month}|${r.week}`)) {
+          skippedReviewed += 1;
+          return null;
+        }
         return {
           employee_id: employeeId,
           year: r.year,
           week: r.week,
           month: r.month,
-          total_hours: round2(42 + r.overtimeHours), // base asumida + extra
+          total_hours: null,
+          source: "novedades",
+          last_date: r.lastDate,
+          estimated: false,
           overtime_hours: r.overtimeHours,
           is_partial: false,
           has_error: false,
@@ -140,7 +213,7 @@ export async function POST(request: Request) {
 
     const { error: recError } = await supabase
       .from("weekly_records")
-      .upsert(recordUpserts, { onConflict: "employee_id,year,week" });
+      .upsert(recordUpserts, { onConflict: "employee_id,year,month,week" });
     if (recError) {
       return NextResponse.json({ error: recError.message }, { status: 500 });
     }
@@ -156,26 +229,36 @@ export async function POST(request: Request) {
       rows_with_error: 0,
     });
 
-    return NextResponse.json({ ...result, persisted: true });
+    return NextResponse.json({ ...result, skippedReviewed, persisted: true });
   }
 
   // ---------- Formato legacy (ID, Rol, Área, Horas Totales) ----------
+  // Semana ISO del archivo (año y número) y, en un corte parcial, el último
+  // día con datos. La semana se reparte en tramos por mes.
   const year = Number(form.get("year"));
   const week = Number(form.get("week"));
-  const month = Number(form.get("month"));
   const cutType = String(form.get("cutType") ?? "final");
   const isPartial = cutType === "parcial";
+  const untilRaw = String(form.get("until") ?? "").trim();
+  const until = untilRaw && parseIsoDate(untilRaw) ? untilRaw : undefined;
 
-  if (!year || !week || !month) {
+  if (!Number.isInteger(year) || year < 2000 || !Number.isInteger(week) || week < 1 || week > 53) {
     return NextResponse.json(
-      { error: "Año, mes y semana son obligatorios para el formato simple." },
+      { error: "Indique el año y la semana del archivo para el formato simple." },
+      { status: 400 }
+    );
+  }
+  if (isPartial && !until) {
+    return NextResponse.json(
+      { error: "En un corte parcial indique hasta qué día trae datos el archivo." },
       { status: 400 }
     );
   }
 
+  const shares = splitWeek(year, week, isPartial ? until : undefined);
   const { rows, errors } = parseBiometricCsv(utf8);
   const records = rows.map((row) =>
-    buildWeeklyRecord(row, { year, week, month, isPartial })
+    buildWeeklyRecord(row, { year: shares[0].year, week, month: shares[0].month, isPartial })
   );
   const preview: PreviewRow[] = records.map((r, i) => ({
     code: rows[i].employeeId,
@@ -196,6 +279,8 @@ export async function POST(request: Request) {
     format: "legacy",
     errors,
     preview,
+    range: rangeOf([isoMonday(year, week), shares[shares.length - 1].lastDate]),
+    estimatedSegments: shares.filter((x) => x.estimated).length,
   };
 
   if (demoOnly || !isSupabaseConfigured()) {
@@ -230,28 +315,51 @@ export async function POST(request: Request) {
     .in("code", rows.map((r) => r.employeeId));
   const idByCode = new Map((employees ?? []).map((e) => [e.code, e.id]));
 
-  const recordUpserts = records
-    .map((r) => {
-      const employeeId = idByCode.get(r.employeeId);
-      if (!employeeId) return null;
-      return {
-        employee_id: employeeId,
-        year: r.year,
-        week: r.week,
-        month: r.month,
-        total_hours: r.totalHours,
-        overtime_hours: r.overtimeHours,
-        is_partial: r.isPartial,
-        has_error: r.hasError,
-        error_reason: r.errorReason ?? null,
-        max_shift_hours: r.maxShiftHours ?? null,
-      };
-    })
-    .filter((r): r is NonNullable<typeof r> => r !== null);
+  let skipped: Set<string>;
+  try {
+    skipped = await protectedKeys(
+      supabase,
+      [...idByCode.values()],
+      shares.map((x) => ({ y: x.year, m: x.month }))
+    );
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+  }
+  let skippedReviewed = 0;
+  // Un registro por empleado y tramo; las horas se reparten por días.
+  const recordUpserts = records.flatMap((r) => {
+    const employeeId = idByCode.get(r.employeeId);
+    if (!employeeId) return [];
+    const total = distribute(r.totalHours, shares);
+    const extra = distribute(r.overtimeHours, shares);
+    return shares.flatMap((sh, i) => {
+      if (skipped.has(`${employeeId}|${sh.year}|${sh.month}|${sh.week}`)) {
+        skippedReviewed += 1;
+        return [];
+      }
+      return [
+        {
+          employee_id: employeeId,
+          year: sh.year,
+          week: sh.week,
+          month: sh.month,
+          total_hours: total[i],
+          source: "biometrico",
+          last_date: sh.lastDate,
+          estimated: sh.estimated,
+          overtime_hours: extra[i],
+          is_partial: r.isPartial,
+          has_error: r.hasError,
+          error_reason: r.errorReason ?? null,
+          max_shift_hours: r.maxShiftHours ?? null,
+        },
+      ];
+    });
+  });
 
   const { error: recError } = await supabase
     .from("weekly_records")
-    .upsert(recordUpserts, { onConflict: "employee_id,year,week" });
+    .upsert(recordUpserts, { onConflict: "employee_id,year,month,week" });
   if (recError) {
     return NextResponse.json({ error: recError.message }, { status: 500 });
   }
@@ -266,5 +374,5 @@ export async function POST(request: Request) {
     rows_with_error: withError,
   });
 
-  return NextResponse.json({ ...result, persisted: true });
+  return NextResponse.json({ ...result, skippedReviewed, persisted: true });
 }

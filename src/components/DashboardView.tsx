@@ -13,8 +13,8 @@ import { Heatmap } from "./charts/Heatmap";
 import { StatusBadge } from "./StatusBadge";
 import { DashboardFilters } from "./DashboardFilters";
 import { FigureCluster } from "./brand/Figures";
-import { RULES } from "@/lib/overtime";
-import { MONTHS, formatWeekRange, weeksOfMonth } from "@/lib/dates";
+import { fmtH, monthlyTarget, RULES } from "@/lib/overtime";
+import { daysInMonth as monthDays, formatDayLong, monthLabel } from "@/lib/dates";
 import type { Role } from "@/lib/types";
 import type {
   DashboardCharts,
@@ -29,17 +29,16 @@ const ROLE_FOCUS: Record<Role | "demo", { tag: string; focus: string }> = {
   rrhh: {
     tag: "Recursos Humanos",
     focus:
-      "Vista global de la planta: cumplimiento legal del mes y cargas por dirección, área y sede.",
+      "Toda la organización: quién va por encima de la meta del mes, quién superó 48h y qué registros hay que revisar.",
   },
   director: {
-    tag: "Dirección de planta",
+    tag: "Director",
     focus:
-      "Comparativo por sede y dirección, proyección de cierre de mes y solicitudes por aprobar.",
+      "Su dirección: quién va por encima de la meta, cómo cerraría el mes y en qué áreas se concentran las horas.",
   },
   jefe: {
     tag: "Jefe inmediato",
-    focus:
-      "Su equipo: quién se acerca al límite mensual y quién tiene horas disponibles para turnos.",
+    focus: "Su equipo directo: quién va por encima de la meta del mes y quién está cerca de 48h.",
   },
   demo: {
     tag: "Demostración",
@@ -48,27 +47,42 @@ const ROLE_FOCUS: Record<Role | "demo", { tag: string; focus: string }> = {
   },
 };
 
-/** Texto del periodo: mes, estado y semana de referencia con su rango. */
-function periodLabel(period: Period): { main: string; note?: string } {
-  const weeks = weeksOfMonth(period.year, period.month);
-  const ref = weeks.find((w) => w.week === period.week) ?? weeks[weeks.length - 1];
-  const mes = `${MONTHS[period.month - 1]} ${period.year}`;
-  const mesCap = mes.charAt(0).toUpperCase() + mes.slice(1);
-  const rango = formatWeekRange(ref.start, ref.end);
-  if (period.status === "cerrado") {
-    return { main: `${mesCap} · mes cerrado (${weeks.length} semanas)` };
+/** Datos del mes que se muestran en la cabecera y usa el panel lateral. */
+function periodInfo(period: Period) {
+  const days = period.daysInMonth ?? monthDays(period.year, period.month);
+  const cutoff = period.cutoffDay ?? 0;
+  const cutoffLabel =
+    cutoff > 0 ? formatDayLong({ y: period.year, m: period.month, d: cutoff }) : null;
+  const month = monthLabel(period.year, period.month);
+  let main = month;
+  if (period.status === "futuro") main += " · el mes aún no empieza";
+  else if (!cutoffLabel) main += " · sin datos cargados";
+  else {
+    main += period.status === "cerrado" ? " · mes cerrado" : "";
+    main += ` · datos hasta el ${cutoffLabel} · meta a esa fecha ${fmtH(monthlyTarget(cutoff))}`;
   }
-  if (period.status === "futuro") {
-    return { main: `${mesCap} · el mes aún no empieza` };
-  }
-  const cubiertas = period.coveredWeeks ?? 0;
-  const main = `${mesCap} · semana ${ref.week} (${rango}) · ${cubiertas} de ${weeks.length} semanas con datos`;
-  // La semana se imputa al mes de su jueves: avisar cuando cruza de mes.
-  const note =
-    ref.start.m !== period.month || ref.end.m !== period.month
-      ? `La semana ${ref.week} cuenta para ${MONTHS[period.month - 1]} porque su jueves cae en ese mes.`
-      : undefined;
-  return { main, note };
+  return {
+    main,
+    drawer: {
+      daysInMonth: days,
+      cutoffDay: cutoff,
+      monthLabel: month,
+      cutoffLabel,
+      closed: period.status === "cerrado",
+    },
+  };
+}
+
+/** «12 pers. · 1 excedido · 2 en riesgo · 6,5h/pers.» */
+function groupSub(g: { count: number; red: number; yellow: number; perPerson: number }): string {
+  return [
+    `${g.count} pers.`,
+    g.red ? `${g.red} excedido${g.red > 1 ? "s" : ""}` : "",
+    g.yellow ? `${g.yellow} en riesgo` : "",
+    `${fmtH(g.perPerson)}/pers.`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 export function DashboardView({
@@ -99,23 +113,12 @@ export function DashboardView({
   /** Query string vigente (filtros y mes), para no perder el contexto. */
   query?: string;
 }) {
-  // Proyección de cierre de mes: quién superará las 48h (aún no en rojo).
+  const info = periodInfo(period);
+  const noData = info.drawer.cutoffDay === 0;
+  // En riesgo, primero quien más se pasa de la meta; luego por proyección.
   const atRisk = statuses
-    .filter((s) => s.level !== "red" && s.willExceedMonthly)
-    .sort((a, b) => b.projectedMonthlyOvertime - a.projectedMonthlyOvertime);
-
-  // Rotación equitativa: más horas disponibles = mejores candidatos a turnos.
-  const rotation = statuses
-    .filter((s) => !s.hasError && s.level !== "red")
-    .sort((a, b) => b.availableMonthly - a.availableMonthly)
-    .slice(0, 6);
-
-  const avgConsumption =
-    summary.totalEmployees > 0
-      ? (summary.totalMonthlyOvertime /
-          (summary.totalEmployees * RULES.MONTHLY_OVERTIME_LIMIT)) *
-        100
-      : 0;
+    .filter((s) => s.level === "yellow")
+    .sort((a, b) => b.overTarget - a.overTarget || b.projectedMonthlyOvertime - a.projectedMonthlyOvertime);
 
   // Los enlaces a la ficha arrastran los filtros vigentes para poder volver
   // al panel exactamente como estaba.
@@ -127,7 +130,8 @@ export function DashboardView({
   return (
     <DrawerProvider
       statuses={statuses}
-      weeksByEmployee={charts.weeksByEmployee}
+      segmentsByEmployee={charts.segmentsByEmployee}
+      period={info.drawer}
       hrefBase={hrefBase}
       roleParam={roleParam}
       query={query}
@@ -144,11 +148,8 @@ export function DashboardView({
               </div>
               <h1 className="text-2xl font-bold text-brand-dark">Panel de control</h1>
               <p className="text-sm text-slate-600">
-                {scopeLabel} · {periodLabel(period).main}
+                {scopeLabel} · {info.main}
               </p>
-              {periodLabel(period).note && (
-                <p className="text-xs text-slate-500">{periodLabel(period).note}</p>
-              )}
               <p className="mt-1 max-w-[65ch] text-[15px] leading-relaxed text-slate-600">
                 {ROLE_FOCUS[role].focus}
               </p>
@@ -174,61 +175,75 @@ export function DashboardView({
           <DashboardFilters options={filterOptions} current={filters} />
         )}
 
+        {noData && (
+          <div className="card text-center">
+            <p className="text-sm font-medium text-brand-dark">Sin datos cargados para este mes</p>
+            <p className="mt-1 text-sm text-slate-600">
+              Cuando Recursos Humanos cargue el archivo del biométrico, aquí aparecerán el
+              acumulado, la meta y las alertas.
+            </p>
+          </div>
+        )}
+
         {/* KPIs: cada uno abre a la derecha la lista de personas que lo componen. */}
-        <section className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+        <section className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
           <KpiCard
-            label="Personas en la vista"
-            value={summary.totalEmployees}
-            hint="Según los filtros aplicados"
-            segment="all"
+            label="Personas en riesgo"
+            value={summary.yellow}
+            tone={summary.yellow > 0 ? "yellow" : "default"}
+            hint={
+              summary.yellow > 0
+                ? `${summary.riskByTarget} sobre la meta · ${summary.riskByProjection} por proyección`
+                : "Nadie va por encima de la meta"
+            }
+            segment="yellow"
             delay={0}
           />
           <KpiCard
-            label="Excedieron el mes"
+            label={`Excedieron ${RULES.MONTHLY_OVERTIME_LIMIT}h`}
             value={summary.red}
             tone={summary.red > 0 ? "red" : "default"}
-            hint="Más de 48h extra acumuladas"
+            hint={`Más de ${RULES.MONTHLY_OVERTIME_LIMIT}h extra en el mes`}
             segment="red"
             delay={50}
           />
           <KpiCard
-            label="En riesgo de excederse"
-            value={summary.atRiskMonthly}
-            tone={summary.atRiskMonthly > 0 ? "yellow" : "default"}
-            hint="La proyección de cierre pasa de 48h"
-            segment="atRisk"
+            label="Horas extra del mes"
+            value={fmtH(summary.totalMonthlyOvertime)}
+            hint={`${summary.totalEmployees} persona${summary.totalEmployees === 1 ? "" : "s"} en la vista`}
+            segment="all"
             delay={100}
           />
           <KpiCard
-            label="Horas extra del mes"
-            value={`${summary.totalMonthlyOvertime.toFixed(0)}h`}
-            hint="Suma de todas las personas de la vista"
-            segment="all"
-            delay={150}
-          />
-          <KpiCard
-            label="Semanas de más de 12h"
+            label={`Semanas por encima de ${RULES.WEEKLY_OVERTIME_LIMIT}h`}
             value={summary.weeklyHigh}
             hint={
               summary.weeklyHigh > 0
-                ? `De ${summary.weeklyHighPeople} persona${summary.weeklyHighPeople === 1 ? "" : "s"} este mes · informativo`
-                : "Informativo: el límite que cuenta es el mensual"
+                ? `De ${summary.weeklyHighPeople} persona${summary.weeklyHighPeople === 1 ? "" : "s"} · lunes a domingo · informativo`
+                : "Lunes a domingo · informativo"
             }
             segment="weeklyHigh"
-            delay={200}
+            delay={150}
           />
           <KpiCard
             label="Registros por revisar"
             value={summary.withErrors}
             tone={summary.withErrors > 0 ? "violet" : "default"}
-            hint="Personas con turnos de más de 16h sin salida, congelados"
+            hint="Turnos de más de 16h sin salida, congelados"
             segment="errors"
-            delay={250}
+            delay={200}
           />
         </section>
 
         {/* Centro de alertas: cada alerta es una fila desplegable. */}
-        <AlertsCenter delay={300} />
+        <AlertsCenter
+          delay={300}
+          reviewHref={
+            role === "rrhh" || role === "demo"
+              ? `${hrefBase.replace(/\/empleado$/, "/revisiones")}${roleParam ? `?rol=${roleParam}` : ""}`
+              : undefined
+          }
+        />
 
         {/* Gráficos */}
         <CollapsibleCard
@@ -245,25 +260,23 @@ export function DashboardView({
                 centerLabel="empleados"
                 segments={[
                   { label: "Normal", value: summary.green, color: "#16a34a", segment: "green" },
-                  { label: "Preventivo", value: summary.yellow, color: "#FF8400", segment: "yellow" },
-                  { label: "Crítico", value: summary.red, color: "#dc2626", segment: "red" },
+                  { label: "En riesgo", value: summary.yellow, color: "#FF8400", segment: "yellow" },
+                  { label: "Excedido", value: summary.red, color: "#dc2626", segment: "red" },
                 ]}
               />
             </div>
 
             <div className="rounded-lg border border-slate-100 p-4">
               <h3 className="mb-1 text-sm font-semibold text-brand-dark">
-                Horas extra por semana
+                Horas extra por tramo del mes
               </h3>
               <p className="mb-3 text-xs text-slate-500">
-                Total del alcance · consumo del límite legal ≈{" "}
-                {avgConsumption.toFixed(0)}% del presupuesto mensual
+                Suma de la vista en cada tramo · los tramos parciales tienen menos días
               </p>
               <TrendChart
-                points={charts.weeklyTrend.map((w) => ({
-                  label: `Sem ${w.week}`,
-                  value: w.overtime,
-                }))}
+                points={charts.trend
+                  .filter((w) => !w.future)
+                  .map((w) => ({ label: w.short, value: w.overtime }))}
               />
             </div>
 
@@ -276,7 +289,7 @@ export function DashboardView({
                 items={charts.byArea.map((a) => ({
                   label: a.area,
                   value: a.overtime,
-                  sublabel: `${a.count} pers.${a.red ? ` · ${a.red} crítico` : ""}`,
+                  sublabel: groupSub(a),
                 }))}
               />
             </div>
@@ -307,7 +320,7 @@ export function DashboardView({
                 items={charts.byPlant.map((g) => ({
                   label: g.label,
                   value: g.overtime,
-                  sublabel: `${g.count} pers.${g.red ? ` · ${g.red} crítico` : ""}`,
+                  sublabel: groupSub(g),
                 }))}
               />
             </div>
@@ -322,18 +335,18 @@ export function DashboardView({
                 items={charts.byDireccion.map((g) => ({
                   label: g.label,
                   value: g.overtime,
-                  sublabel: `${g.count} pers.${g.red ? ` · ${g.red} crítico` : ""}`,
+                  sublabel: groupSub(g),
                 }))}
               />
             </div>
           </div>
         </CollapsibleCard>
 
-        {/* Heatmap área × semana */}
+        {/* Heatmap área × tramo */}
         <CollapsibleCard
-          title="Mapa de calor · horas extra por área y semana"
+          title="Mapa de calor · horas por persona, por área y tramo"
           delay={400}
-          subtitle="Más oscuro = más horas. Desplácese en horizontal para ver todas las semanas."
+          subtitle="Cada celda compara las horas por persona del área con la meta del tramo. ▲ = por encima de la meta."
           defaultOpen={false}
         >
           <Heatmap data={charts.heatmap} />
@@ -341,19 +354,19 @@ export function DashboardView({
 
         {/* Proyección de cierre + reincidentes */}
         <CollapsibleCard
-          title="Proyección de cierre y reincidentes"
+          title="En riesgo y reincidentes"
           delay={450}
-          subtitle="Quién superaría las 48h del mes y quién repite semanas altas."
+          subtitle="Quién va por encima de la meta o cerraría por encima de 48h, y quién repite semanas de más de 12h."
           defaultOpen={false}
         >
           <div className="grid gap-5 lg:grid-cols-2">
             <div className="rounded-lg border border-slate-100 p-4">
               <h3 className="mb-3 text-sm font-semibold text-brand-dark">
-                En riesgo de superar 48h
+                En riesgo
               </h3>
               {atRisk.length === 0 ? (
                 <p className="py-4 text-center text-sm text-slate-500">
-                  Ningún empleado proyecta superar el límite mensual.
+                  Nadie va por encima de la meta ni proyecta superar {RULES.MONTHLY_OVERTIME_LIMIT}h.
                 </p>
               ) : (
                 <ul className="divide-y divide-slate-100 text-sm">
@@ -369,11 +382,22 @@ export function DashboardView({
                       <span className="hidden truncate text-xs text-slate-500 sm:block">
                         {s.area}
                       </span>
-                      <span className="ml-auto shrink-0 tabular-nums text-slate-600">
-                        {s.monthlyOvertime.toFixed(0)}h →{" "}
-                        <span className="font-semibold text-status-yellow">
-                          ≈{s.projectedMonthlyOvertime.toFixed(0)}h
-                        </span>
+                      <span className="ml-auto shrink-0 text-right tabular-nums text-slate-600">
+                        {s.risk === "meta" ? (
+                          <>
+                            {fmtH(s.monthlyOvertime)}{" "}
+                            <span className="font-semibold text-status-yellow">
+                              (+{fmtH(s.overTarget)} meta)
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            {fmtH(s.monthlyOvertime)} →{" "}
+                            <span className="font-semibold text-status-yellow">
+                              ≈{fmtH(s.projectedMonthlyOvertime)}
+                            </span>
+                          </>
+                        )}
                       </span>
                     </li>
                   ))}
@@ -383,7 +407,7 @@ export function DashboardView({
 
             <div className="rounded-lg border border-slate-100 p-4">
               <h3 className="mb-3 text-sm font-semibold text-brand-dark">
-                Reincidentes · 2+ semanas por encima de 12h
+                Reincidentes · 2 o más semanas de más de {RULES.WEEKLY_OVERTIME_LIMIT}h
               </h3>
               {charts.reincidentes.length === 0 ? (
                 <p className="py-4 text-center text-sm text-slate-500">
@@ -402,7 +426,7 @@ export function DashboardView({
                       </EmployeeLink>
                       <StatusBadge level={r.level} />
                       <span className="ml-auto shrink-0 text-xs font-medium text-slate-600">
-                        {r.weeksHigh} semanas altas
+                        {r.weeksHigh} semanas &gt; {RULES.WEEKLY_OVERTIME_LIMIT}h
                       </span>
                     </li>
                   ))}
@@ -410,31 +434,6 @@ export function DashboardView({
               )}
             </div>
           </div>
-        </CollapsibleCard>
-
-        {/* Rotación equitativa */}
-        <CollapsibleCard
-          title="Rotación equitativa · candidatos con más horas disponibles"
-          delay={500}
-          subtitle="Sugerencia para repartir turnos sin acercar a nadie al límite mensual."
-          defaultOpen={false}
-        >
-          {rotation.length === 0 ? (
-            <p className="py-4 text-center text-sm text-slate-500">Sin candidatos.</p>
-          ) : (
-            <HBarChart
-              unit="h"
-              color="#00CBBF"
-              items={rotation.map((s) => ({
-                label: s.name ?? s.code,
-                value: s.availableMonthly,
-                level: s.level,
-                sublabel: `${s.area ?? "—"} · disponible`,
-                href: empLink(s.id),
-                employeeId: s.id,
-              }))}
-            />
-          )}
         </CollapsibleCard>
 
         <CollapsibleCard

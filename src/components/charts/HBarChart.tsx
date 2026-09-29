@@ -96,7 +96,7 @@ export function HBarChart({
                 {it.label}
               </span>
               <span className="shrink-0 font-semibold tabular-nums text-brand-dark">
-                {it.value.toFixed(1)}
+                {it.value.toFixed(1).replace(".", ",")}
                 {unit}
               </span>
               <span
@@ -119,7 +119,7 @@ export function HBarChart({
                   backgroundColor: color,
                   animationDelay: `${i * 60}ms`,
                 }}
-                title={`${it.label}: ${it.value.toFixed(1)}${unit}`}
+                title={`${it.label}: ${it.value.toFixed(1).replace(".", ",")}${unit}`}
               />
             </div>
           </>

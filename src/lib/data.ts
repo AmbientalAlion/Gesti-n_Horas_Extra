@@ -19,7 +19,7 @@ import {
 } from "./aggregate";
 import { DEMO_PERIOD, demoEmployees, demoRecords, isSupabaseConfigured } from "./demo";
 import { createClient } from "./supabase/server";
-import { coveredWeeks, currentPeriodInfo, periodForMonth } from "./dates";
+import { currentPeriodInfo, cutoffDay, periodForMonth, todayInPlant } from "./dates";
 import { buildPayrollRows, type PayrollRow, type Recargos } from "./payroll";
 import type { Role, WeeklyRecord } from "./types";
 
@@ -40,7 +40,8 @@ export interface SessionProfile {
   id: string;
   email: string;
   fullName: string | null;
-  role: Role;
+  /** null = cuenta sin rol asignado: no ve datos. */
+  role: Role | null;
 }
 
 /** Devuelve el perfil del usuario autenticado, o null si no hay sesión. */
@@ -63,8 +64,20 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
     id: profile.id,
     email: profile.email,
     fullName: profile.full_name,
-    role: profile.role as Role,
+    role: (profile.role as Role | null) ?? null,
   };
+}
+
+/**
+ * Páginas solo para Recursos Humanos (cargar, exportar, revisar, usuarios).
+ * Sin Supabase (modo demostración) no aplica.
+ */
+export async function requireRrhh(): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const { redirect } = await import("next/navigation");
+  const profile = await getSessionProfile();
+  if (!profile) redirect("/login");
+  if (profile!.role !== "rrhh") redirect("/dashboard");
 }
 
 /**
@@ -86,10 +99,7 @@ export async function getDashboardData(
     const emps = applyFilters(demoEmployees, filters);
     const ids = new Set(emps.map((e) => e.id));
     const recs = demoRecords.filter((r) => ids.has(r.employeeId));
-    const dp: Period = {
-      ...DEMO_PERIOD,
-      coveredWeeks: coveredWeeks(demoRecords, DEMO_PERIOD.year, DEMO_PERIOD.month),
-    };
+    const dp: Period = DEMO_PERIOD;
     const statuses = computeEmployeeStatuses(emps, recs, dp);
     lastRecords = recs;
     return {
@@ -130,10 +140,9 @@ export async function getDashboardData(
   const { data: recordsRaw } = await supabase
     .from("weekly_records")
     .select(
-      "employee_id, year, week, month, total_hours, overtime_hours, is_partial, has_error, error_reason, max_shift_hours, review_status, source"
+      "employee_id, year, week, month, total_hours, overtime_hours, is_partial, has_error, error_reason, max_shift_hours, review_status, source, last_date, estimated"
     )
-    .eq("year", p.year)
-    .eq("month", p.month);
+    .or(neighbourMonthsFilter(p.year, p.month));
 
   const records: WeeklyRecord[] = (recordsRaw ?? []).map((r: any) => ({
     employeeId: r.employee_id,
@@ -148,6 +157,8 @@ export async function getDashboardData(
     maxShiftHours: r.max_shift_hours != null ? Number(r.max_shift_hours) : undefined,
     reviewStatus: r.review_status ?? undefined,
     source: r.source ?? (r.total_hours == null ? "novedades" : "biometrico"),
+    lastDate: r.last_date ?? undefined,
+    estimated: r.estimated ?? false,
   }));
 
   const filterOptions = buildFilterOptions(employees, filters);
@@ -157,7 +168,10 @@ export async function getDashboardData(
 
   // Cobertura del mes sobre TODOS los registros visibles (no solo los
   // filtrados): así el ritmo de la proyección no depende de los filtros.
-  const pc: Period = { ...p, coveredWeeks: p.coveredWeeks ?? coveredWeeks(records, p.year, p.month) };
+  const pc: Period = {
+    ...p,
+    cutoffDay: p.cutoffDay ?? cutoffDay(records, p.year, p.month, todayInPlant()),
+  };
   lastRecords = filteredRecords;
   const statuses = computeEmployeeStatuses(filteredEmployees, filteredRecords, pc);
   return {
@@ -177,9 +191,10 @@ export async function getDashboardData(
  * ranking). Devuelve null si el empleado no existe o está fuera del alcance.
  */
 export async function getEmployeeDetail(
-  id: string
+  id: string,
+  month?: { year: number; month: number }
 ): Promise<EmployeeDetail | null> {
-  const period = currentPeriod();
+  const period = month ? periodFromInfo(periodForMonth(month.year, month.month)) : currentPeriod();
 
   if (!isSupabaseConfigured()) {
     // Modo demo (área autenticada sin Supabase): usar dataset de ejemplo.
@@ -199,10 +214,10 @@ export async function getEmployeeDetail(
   const { data: recordsRaw } = await supabase
     .from("weekly_records")
     .select(
-      "employee_id, year, week, month, total_hours, overtime_hours, is_partial, has_error, error_reason, max_shift_hours, review_status, source, ot_extra_diurna, ot_extra_nocturna, ot_dom_diurna, ot_dom_nocturna"
+      "employee_id, year, week, month, total_hours, overtime_hours, is_partial, has_error, error_reason, max_shift_hours, review_status, source, last_date, estimated, ot_extra_diurna, ot_extra_nocturna, ot_dom_diurna, ot_dom_nocturna"
     )
     .eq("employee_id", id)
-    .eq("year", period.year);
+    .in("year", [period.year - 1, period.year, period.year + 1]);
 
   const raw = recordsRaw ?? [];
   const history: WeeklyRecord[] = raw.map((r: any) => ({
@@ -218,12 +233,14 @@ export async function getEmployeeDetail(
     maxShiftHours: r.max_shift_hours != null ? Number(r.max_shift_hours) : undefined,
     reviewStatus: r.review_status ?? undefined,
     source: r.source ?? (r.total_hours == null ? "novedades" : "biometrico"),
+    lastDate: r.last_date ?? undefined,
+    estimated: r.estimated ?? false,
   }));
 
   const detail = buildEmployeeDetail(status, history, dash.statuses, dash.period);
 
   // Desglose de recargos del mes (formato real).
-  const monthRaw = raw.filter((r: any) => r.month === period.month);
+  const monthRaw = raw.filter((r: any) => r.year === period.year && r.month === period.month);
   const rec = {
     diurna: sum(monthRaw, "ot_extra_diurna"),
     nocturna: sum(monthRaw, "ot_extra_nocturna"),
@@ -241,55 +258,17 @@ function sum(rows: any[], key: string): number {
   return Math.round(rows.reduce((a, r) => a + Number(r[key] ?? 0), 0) * 100) / 100;
 }
 
-export interface PendingAuth {
-  id: string;
-  employeeName: string;
-  area: string;
-  hours: number;
-  dayDate: string | null;
-  week: number;
-  requestedAt: string;
-}
-
-/**
- * Solicitudes de autorización pendientes ("solicitada") visibles para quien
- * aprueba (Director de planta o RRHH). Alimenta la campanita de notificaciones.
- * Devuelve [] para otros roles o cuando no hay Supabase.
- */
-export async function getPendingAuthorizations(): Promise<PendingAuth[]> {
-  if (!isSupabaseConfigured()) return [];
-  const profile = await getSessionProfile();
-  if (!profile || (profile.role !== "rrhh" && profile.role !== "director")) {
-    return [];
-  }
-  const supabase = createClient();
-  const { data } = await supabase
-    .from("overtime_authorizations")
-    .select(
-      "id, hours, day_date, week, requested_at, employees(name, code, area)"
-    )
-    .eq("status", "solicitada")
-    .order("requested_at", { ascending: false })
-    .limit(30);
-
-  return (data ?? []).map((r: any) => ({
-    id: r.id,
-    employeeName: r.employees?.name ?? r.employees?.code ?? "—",
-    area: r.employees?.area ?? "—",
-    hours: Number(r.hours),
-    dayDate: r.day_date ?? null,
-    week: r.week,
-    requestedAt: r.requested_at,
-  }));
-}
-
 /**
  * Periodo actual: semana ISO en curso en hora de Colombia y el mes al que se
  * imputa (mes de su jueves). Ver src/lib/dates.ts.
  */
+function periodFromInfo(p: ReturnType<typeof periodForMonth>): Period {
+  return { year: p.year, month: p.month, week: p.week, status: p.status, daysInMonth: p.daysInMonth };
+}
+
 export function currentPeriod(now: Date = new Date()): Period {
   const p = currentPeriodInfo(now);
-  return { year: p.year, month: p.month, week: p.week, status: p.status, weeksInMonth: p.weeksInMonth };
+  return { year: p.year, month: p.month, week: p.week, status: p.status, daysInMonth: p.daysInMonth };
 }
 
 export interface PayrollData {
@@ -309,7 +288,7 @@ export async function getPayrollData(year: number, month: number): Promise<Payro
     month: info.month,
     week: info.week,
     status: info.status,
-    weeksInMonth: info.weeksInMonth,
+    daysInMonth: info.daysInMonth,
   };
   const dash = await getDashboardData(isSupabaseConfigured() ? base : undefined);
   const records = lastRecords;
@@ -339,4 +318,16 @@ export async function getPayrollData(year: number, month: number): Promise<Payro
     period: dash.period,
     demo: dash.demo,
   };
+}
+
+/**
+ * Filtro PostgREST del mes y sus vecinos: las semanas que cruzan de mes
+ * necesitan el tramo del otro mes para la alerta de 12h de lunes a domingo.
+ */
+function neighbourMonthsFilter(year: number, month: number): string {
+  const prev = month === 1 ? { y: year - 1, m: 12 } : { y: year, m: month - 1 };
+  const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
+  return [prev, { y: year, m: month }, next]
+    .map((x) => `and(year.eq.${x.y},month.eq.${x.m})`)
+    .join(",");
 }

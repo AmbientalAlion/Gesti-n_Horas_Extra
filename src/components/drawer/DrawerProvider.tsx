@@ -12,8 +12,9 @@ import {
   GroupQuickView,
   SEGMENT_TEXT,
   SegmentQuickView,
+  type DrawerPeriod,
 } from "./views";
-import type { EmployeeStatus, EmployeeWeek } from "@/lib/aggregate";
+import type { EmployeeStatus, SegmentPoint } from "@/lib/aggregate";
 
 /**
  * Proveedor del panel lateral del dashboard. Cualquier componente cliente
@@ -22,14 +23,16 @@ import type { EmployeeStatus, EmployeeWeek } from "@/lib/aggregate";
  */
 export function DrawerProvider({
   statuses,
-  weeksByEmployee,
+  segmentsByEmployee,
+  period,
   hrefBase,
   roleParam,
   query,
   children,
 }: {
   statuses: EmployeeStatus[];
-  weeksByEmployee: Record<string, EmployeeWeek[]>;
+  segmentsByEmployee: Record<string, SegmentPoint[]>;
+  period: DrawerPeriod;
   hrefBase: string;
   roleParam?: string;
   query?: string;
@@ -68,8 +71,8 @@ export function DrawerProvider({
   );
 
   const api: DrawerApi = useMemo(
-    () => ({ open, push, close, statuses, weeksByEmployee, fichaHref }),
-    [open, push, close, statuses, weeksByEmployee, fichaHref]
+    () => ({ open, push, close, statuses, segmentsByEmployee, period, fichaHref }),
+    [open, push, close, statuses, segmentsByEmployee, period, fichaHref]
   );
 
   const current = stack[stack.length - 1] ?? last;
@@ -86,7 +89,12 @@ export function DrawerProvider({
     eyebrow = "Persona";
     title = s ? s.name ?? s.code : "Persona";
     body = s ? (
-      <EmployeeQuickView s={s} weeks={weeksByEmployee[s.id] ?? []} push={push} />
+      <EmployeeQuickView
+        s={s}
+        segments={segmentsByEmployee[s.id] ?? []}
+        period={period}
+        push={push}
+      />
     ) : (
       <p className="text-sm text-slate-600">
         Esta persona ya no está en la vista actual.

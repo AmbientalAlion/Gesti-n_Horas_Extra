@@ -3,25 +3,28 @@
 import { useEffect, useId, useRef, useState } from "react";
 import clsx from "clsx";
 import { useDrawer } from "./drawer/context";
+import { LevelIcon } from "./StatusBadge";
+
+const TONE = { green: "text-status-green", yellow: "text-status-yellow", red: "text-status-red" } as const;
 
 const STATES = [
   {
     seg: "green" as const,
-    dot: "bg-status-green",
+    level: "green" as const,
     t: "Normal",
-    d: "Menos de 40 horas extra en el mes y la proyección cierra dentro de las 48.",
+    d: "Va dentro de la meta a la fecha y, a su ritmo, cierra el mes en 48h o menos.",
   },
   {
     seg: "yellow" as const,
-    dot: "bg-status-yellow",
-    t: "Preventivo",
-    d: "Llegó a 40 horas extra en el mes, o la proyección de cierre superaría las 48. Revise antes de asignarle más turnos.",
+    level: "yellow" as const,
+    t: "En riesgo",
+    d: "Su acumulado supera la meta a la fecha (12h por semana, proporcional en semanas parciales), o a su ritmo cerraría el mes por encima de 48h.",
   },
   {
     seg: "red" as const,
-    dot: "bg-status-red",
-    t: "Crítico",
-    d: "Superó las 48 horas extra del mes. No debe asignársele más horas extra en este periodo.",
+    level: "red" as const,
+    t: "Excedido",
+    d: "Superó las 48 horas extra del mes.",
   },
 ];
 
@@ -42,8 +45,11 @@ export function LegendStrip({ counts }: { counts: Record<"green" | "yellow" | "r
     <section className="rounded-xl border border-brand/20 bg-brand-tint px-4 py-3 motion-safe:animate-fade-in-up sm:px-5">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <p className="min-w-0 flex-1 text-sm leading-snug text-slate-700">
-          <strong className="text-brand-dark">Límite que no se puede superar: 48h extra al mes.</strong>{" "}
-          <span className="text-slate-600">Pasar de 12h en una semana está permitido.</span>
+          <strong className="text-brand-dark">Límite: 48h extra al mes.</strong>{" "}
+          <span className="text-slate-600">
+            La meta avanza 12h por semana (proporcional en semanas parciales). Pasar de 12h
+            en una semana genera una alerta informativa.
+          </span>
         </p>
         <div className="flex flex-wrap items-center gap-1.5">
           {STATES.map((s) => (
@@ -54,7 +60,7 @@ export function LegendStrip({ counts }: { counts: Record<"green" | "yellow" | "r
               className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-white hover:shadow-sm"
               title={`Ver a las personas en estado ${s.t.toLowerCase()}`}
             >
-              <span className={clsx("h-2.5 w-2.5 rounded-full", s.dot)} aria-hidden />
+              <LevelIcon level={s.level} className={TONE[s.level]} />
               {s.t}
               <span className="tabular-nums text-slate-500">{counts[s.seg]}</span>
             </button>
@@ -85,7 +91,7 @@ export function LegendStrip({ counts }: { counts: Record<"green" | "yellow" | "r
             {STATES.map((s) => (
               <div key={s.t} className="rounded-lg bg-white/70 p-3">
                 <dt className="flex items-center gap-2 text-[13px] font-semibold text-brand-dark">
-                  <span className={clsx("h-2.5 w-2.5 rounded-full", s.dot)} aria-hidden />
+                  <LevelIcon level={s.level} className={TONE[s.level]} />
                   {s.t}
                 </dt>
                 <dd className="mt-1 text-[13px] leading-snug text-slate-600">{s.d}</dd>

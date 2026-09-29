@@ -1,97 +1,131 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  coveredWeeks,
   currentPeriodInfo,
-  formatWeekRange,
-  isoDate,
+  cutoffDay,
+  daysInMonth,
+  formatWeekLabel,
+  isoWeekMonday,
+  monthSegments,
   monthStatus,
   parseIsoDate,
   periodForMonth,
+  segmentOfDate,
   todayInPlant,
-  weekDays,
   weekInfo,
-  weeksOfMonth,
+  weekSegments,
 } from "./dates";
 
-describe("todayInPlant (hora de Colombia, no del servidor)", () => {
-  it("a las 19:30 de Colombia sigue siendo el mismo día aunque en UTC ya sea mañana", () => {
-    // 30-sep-2026 19:30 COT = 1-oct-2026 00:30 UTC
-    expect(todayInPlant(new Date("2026-10-01T00:30:00Z"))).toEqual({ y: 2026, m: 9, d: 30 });
-  });
-  it("el domingo por la noche no salta a la semana siguiente", () => {
-    // domingo 4-oct-2026 20:00 COT = lunes 5-oct 01:00 UTC
-    const p = currentPeriodInfo(new Date("2026-10-05T01:00:00Z"));
-    expect(p.week).toBe(40);
+describe("todayInPlant (hora de Colombia)", () => {
+  it("a las 19:30 de Colombia sigue siendo el mismo día aunque en UTC ya sea el siguiente", () => {
+    // 2026-09-29 19:30 COT = 2026-09-30 00:30 UTC
+    expect(todayInPlant(new Date("2026-09-30T00:30:00Z"))).toEqual({ y: 2026, m: 9, d: 29 });
   });
 });
 
-describe("weekInfo (semana ISO y mes del jueves)", () => {
-  it("la semana 40 de 2026 (28 sep – 4 oct) se imputa a octubre", () => {
-    expect(weekInfo({ y: 2026, m: 9, d: 29 })).toEqual({ year: 2026, week: 40, month: 10 });
+describe("monthSegments (tramos del mes calendario)", () => {
+  it("CP-01: septiembre 2026 se nombra por fechas y marca los parciales", () => {
+    const segs = monthSegments(2026, 9);
+    expect(segs.map((s) => s.label)).toEqual([
+      "1 al 6 de septiembre (6 días)",
+      "7 al 13 de septiembre",
+      "14 al 20 de septiembre",
+      "21 al 27 de septiembre",
+      "28 al 30 de septiembre (3 días)",
+    ]);
+    expect(segs.map((s) => s.short)).toEqual(["1–6 sep", "7–13 sep", "14–20 sep", "21–27 sep", "28–30 sep"]);
+    expect(segs.map((s) => s.week)).toEqual([36, 37, 38, 39, 40]);
   });
-  it("el 1-ene-2027 pertenece a la semana 53 de 2026, imputada a diciembre", () => {
-    expect(weekInfo({ y: 2027, m: 1, d: 1 })).toEqual({ year: 2026, week: 53, month: 12 });
-  });
-  it("el 29-dic-2025 ya es la semana 1 de 2026, imputada a enero", () => {
-    expect(weekInfo({ y: 2025, m: 12, d: 29 })).toEqual({ year: 2026, week: 1, month: 1 });
-  });
-});
 
-describe("weeksOfMonth", () => {
-  it("septiembre de 2026 tiene 4 semanas (36–39)", () => {
-    expect(weeksOfMonth(2026, 9).map((w) => w.week)).toEqual([36, 37, 38, 39]);
-  });
-  it("octubre de 2026 tiene 5 semanas (40–44)", () => {
-    const w = weeksOfMonth(2026, 10);
-    expect(w.map((x) => x.week)).toEqual([40, 41, 42, 43, 44]);
-    expect(isoDate(w[0].start)).toBe("2026-09-28");
-    expect(isoDate(w[4].end)).toBe("2026-11-01");
-  });
-  it("diciembre de 2026 termina en la semana 53", () => {
-    expect(weeksOfMonth(2026, 12).map((w) => w.week)).toEqual([49, 50, 51, 52, 53]);
-  });
-});
-
-describe("periodos", () => {
-  const hoy = new Date("2026-09-29T15:00:00Z"); // martes 29-sep-2026
-  it("el periodo actual es la semana 40 de octubre, abierto y de 5 semanas", () => {
-    const p = currentPeriodInfo(hoy);
-    expect(p).toMatchObject({ year: 2026, month: 10, week: 40, status: "abierto", weeksInMonth: 5 });
-  });
-  it("septiembre ya está cerrado el 29-sep (su última semana terminó el 27)", () => {
-    expect(monthStatus(2026, 9, todayInPlant(hoy))).toBe("cerrado");
-    const p = periodForMonth(2026, 9, hoy);
-    expect(p).toMatchObject({ status: "cerrado", week: 39 });
-  });
-  it("un mes futuro usa su primera semana", () => {
-    expect(periodForMonth(2026, 12, hoy)).toMatchObject({ status: "futuro", week: 49 });
-  });
-});
-
-describe("coveredWeeks", () => {
-  it("cuenta las semanas del mes hasta la última con datos, aunque falten personas", () => {
-    const recs = [
-      { year: 2026, month: 10, week: 40 },
-      { year: 2026, month: 10, week: 42 },
-      { year: 2026, month: 9, week: 39 },
-    ];
-    expect(coveredWeeks(recs, 2026, 10)).toBe(3);
-    expect(coveredWeeks([], 2026, 10)).toBe(0);
-  });
-});
-
-describe("utilidades", () => {
-  it("weekDays devuelve lunes a domingo", () => {
-    expect(weekDays({ y: 2026, m: 9, d: 30 }).map(isoDate)).toEqual([
-      "2026-09-28", "2026-09-29", "2026-09-30", "2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04",
+  it("febrero 2027 empieza lunes: 4 semanas completas", () => {
+    const segs = monthSegments(2027, 2);
+    expect(segs.map((s) => [s.start.d, s.end.d, s.partial])).toEqual([
+      [1, 7, false],
+      [8, 14, false],
+      [15, 21, false],
+      [22, 28, false],
     ]);
   });
-  it("parseIsoDate rechaza fechas imposibles", () => {
-    expect(parseIsoDate("2026-02-30")).toBeNull();
-    expect(parseIsoDate("2026-10-01")).toEqual({ y: 2026, m: 10, d: 1 });
+
+  it("un mes de 31 días que empieza domingo tiene 6 tramos (mayo 2022)", () => {
+    const segs = monthSegments(2022, 5);
+    expect(segs).toHaveLength(6);
+    expect(segs[0].label).toBe("1 de mayo (1 día)");
+    expect(segs[5].label).toBe("30 al 31 de mayo (2 días)");
   });
-  it("formatWeekRange cruza meses", () => {
-    const [w] = weeksOfMonth(2026, 10);
-    expect(formatWeekRange(w.start, w.end)).toBe("28 sep – 4 oct");
+
+  it("diciembre 2026 termina con un tramo de la semana 53", () => {
+    const segs = monthSegments(2026, 12);
+    const last = segs[segs.length - 1];
+    expect([last.start.d, last.end.d, last.week, last.isoYear]).toEqual([28, 31, 53, 2026]);
+    const jan = monthSegments(2027, 1)[0];
+    expect([jan.start.d, jan.end.d, jan.week, jan.isoYear]).toEqual([1, 3, 53, 2026]);
+  });
+
+  it("segmentOfDate ubica cada día en su tramo", () => {
+    expect(segmentOfDate({ y: 2026, m: 9, d: 29 }).label).toBe("28 al 30 de septiembre (3 días)");
+    expect(segmentOfDate({ y: 2026, m: 10, d: 2 }).label).toBe("1 al 4 de octubre (4 días)");
+  });
+});
+
+describe("semanas que cruzan de mes", () => {
+  it("la semana del 28 sep al 4 oct tiene dos tramos y cuenta en octubre", () => {
+    const segs = weekSegments(2026, 40);
+    expect(segs.map((s) => [s.month, s.days])).toEqual([
+      [9, 3],
+      [10, 4],
+    ]);
+    expect(weekInfo({ y: 2026, m: 9, d: 28 }).month).toBe(10);
+    expect(formatWeekLabel(2026, 40)).toBe("28 sep al 4 oct");
+    expect(formatWeekLabel(2027, 5)).toBe("1 al 7 feb");
+  });
+
+  it("isoWeekMonday", () => {
+    expect(isoWeekMonday(2026, 40)).toEqual({ y: 2026, m: 9, d: 28 });
+    expect(isoWeekMonday(2026, 1)).toEqual({ y: 2025, m: 12, d: 29 });
+  });
+});
+
+describe("estado del mes y periodo", () => {
+  const today = { y: 2026, m: 9, d: 29 };
+  it("mes calendario: septiembre abierto el 29, agosto cerrado, octubre futuro", () => {
+    expect(monthStatus(2026, 9, today)).toBe("abierto");
+    expect(monthStatus(2026, 8, today)).toBe("cerrado");
+    expect(monthStatus(2026, 10, today)).toBe("futuro");
+  });
+
+  it("el periodo actual el 29 de septiembre es septiembre (ya no octubre)", () => {
+    const p = currentPeriodInfo(new Date("2026-09-29T15:00:00Z"));
+    expect(p).toMatchObject({ year: 2026, month: 9, week: 40, status: "abierto", daysInMonth: 30 });
+  });
+
+  it("un mes cerrado toma su último tramo como referencia", () => {
+    const p = periodForMonth(2026, 8, new Date("2026-09-29T15:00:00Z"));
+    expect(p).toMatchObject({ status: "cerrado", daysInMonth: 31, week: 36 });
+  });
+
+  it("daysInMonth", () => {
+    expect([daysInMonth(2027, 2), daysInMonth(2028, 2), daysInMonth(2026, 9)]).toEqual([28, 29, 30]);
+  });
+});
+
+describe("cutoffDay (fecha de corte, RF-04)", () => {
+  const today = { y: 2026, m: 9, d: 29 };
+  it("usa el último día con datos, no la fecha de hoy", () => {
+    const recs = [{ year: 2026, month: 9, week: 38, lastDate: "2026-09-18" }];
+    expect(cutoffDay(recs, 2026, 9, today)).toBe(18);
+  });
+  it("sin lastDate toma el final del tramo, sin pasar de hoy", () => {
+    expect(cutoffDay([{ year: 2026, month: 9, week: 38 }], 2026, 9, today)).toBe(20);
+    expect(cutoffDay([{ year: 2026, month: 9, week: 40 }], 2026, 9, today)).toBe(29);
+  });
+  it("sin datos del mes es 0", () => {
+    expect(cutoffDay([{ year: 2026, month: 8, week: 35 }], 2026, 9, today)).toBe(0);
+  });
+});
+
+describe("parseIsoDate", () => {
+  it("rechaza fechas imposibles", () => {
+    expect(parseIsoDate("2026-02-30")).toBeNull();
+    expect(parseIsoDate("2026-09-01")).toEqual({ y: 2026, m: 9, d: 1 });
   });
 });

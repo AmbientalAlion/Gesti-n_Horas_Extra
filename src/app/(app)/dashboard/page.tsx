@@ -20,8 +20,7 @@ export default async function DashboardPage({
     jefe?: string;
   };
 }) {
-  // Mes elegido (o el de la semana en curso). La semana de referencia es la
-  // actual si el mes está abierto y la última del mes si ya cerró.
+  // Mes calendario elegido (o el actual). La fecha de corte sale de los datos.
   const cur = currentPeriodInfo();
   const mesSel = Number(searchParams.mes);
   const anioSel = Number(searchParams.anio);
@@ -33,7 +32,7 @@ export default async function DashboardPage({
     month: info.month,
     week: info.week,
     status: info.status,
-    weeksInMonth: info.weeksInMonth,
+    daysInMonth: info.daysInMonth,
   };
 
   const filters: Filters = {
@@ -53,7 +52,8 @@ export default async function DashboardPage({
   const { statuses, summary, charts, demo, role, filterOptions, period: dataPeriod } =
     await getDashboardData(period, filters);
 
-  const scopeLabel = role === "jefe" ? "Mi equipo" : "Planta completa";
+  const scopeLabel =
+    role === "jefe" ? "Mi equipo" : role === "director" ? "Mi dirección" : "Toda la organización";
 
   return (
     <div className="space-y-6">

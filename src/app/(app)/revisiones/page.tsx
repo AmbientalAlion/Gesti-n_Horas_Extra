@@ -1,3 +1,4 @@
+import { segmentOfWeek } from "@/lib/dates";
 import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
@@ -7,10 +8,6 @@ import { PageHeader } from "@/components/PageHeader";
 
 export const dynamic = "force-dynamic";
 
-const MONTHS = [
-  "ene", "feb", "mar", "abr", "may", "jun",
-  "jul", "ago", "sep", "oct", "nov", "dic",
-];
 
 export default async function RevisionesPage() {
   const profile = await getSessionProfile();
@@ -59,7 +56,7 @@ export default async function RevisionesPage() {
                       {r.employees?.name ?? r.employees?.code} · {r.employees?.area ?? "—"}
                     </div>
                     <div className="text-xs text-slate-500">
-                      Semana {r.week} · {MONTHS[r.month - 1]} {r.year} · Total cargado{" "}
+                      {segmentOfWeek(r.year, r.month, r.week)?.label ?? `Semana ${r.week}`} {r.year} · Total cargado{" "}
                       {Number(r.total_hours).toFixed(1)}h · Turno máx{" "}
                       {r.max_shift_hours != null ? `${Number(r.max_shift_hours).toFixed(1)}h` : "—"}
                     </div>
@@ -141,7 +138,7 @@ export default async function RevisionesPage() {
                       {r.employees?.name ?? r.employees?.code}
                     </td>
                     <td className="px-4 py-2 text-slate-500">
-                      Sem {r.week} · {MONTHS[r.month - 1]} {r.year}
+                      {segmentOfWeek(r.year, r.month, r.week)?.short ?? `Sem ${r.week}`} {r.year}
                     </td>
                     <td className="px-4 py-2">
                       <span

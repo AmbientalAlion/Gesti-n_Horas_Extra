@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import type { EmployeeStatus, EmployeeWeek } from "@/lib/aggregate";
+import type { EmployeeStatus, SegmentPoint } from "@/lib/aggregate";
+import type { DrawerPeriod } from "./views";
 
 /** Dimensiones por las que se puede abrir un grupo en el panel. */
 export type GroupDim = "area" | "planta" | "direccion" | "jefe";
@@ -12,7 +13,6 @@ export type Segment =
   | "red"
   | "yellow"
   | "green"
-  | "atRisk"
   | "errors"
   | "weeklyHigh";
 
@@ -35,7 +35,8 @@ export interface DrawerApi {
   push: (v: DrawerView) => void;
   close: () => void;
   statuses: EmployeeStatus[];
-  weeksByEmployee: Record<string, EmployeeWeek[]>;
+  segmentsByEmployee: Record<string, SegmentPoint[]>;
+  period: DrawerPeriod;
   /** Enlace a la ficha completa, conservando filtros y rol. */
   fichaHref: (id: string) => string;
 }

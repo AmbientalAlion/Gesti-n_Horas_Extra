@@ -4,10 +4,8 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import clsx from "clsx";
 import type { Role } from "@/lib/types";
-import type { PendingAuth } from "@/lib/data";
 import { BrandMark, Claim } from "@/components/brand/BrandMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { NotificationBell } from "@/components/NotificationBell";
 
 const ROLES: { key: Role; label: string }[] = [
   { key: "rrhh", label: "RRHH" },
@@ -15,19 +13,12 @@ const ROLES: { key: Role; label: string }[] = [
   { key: "jefe", label: "Jefe" },
 ];
 
-// Solicitudes pendientes de ejemplo para la campanita (solo vistas de aprobador).
-const DEMO_PENDING: PendingAuth[] = [
-  { id: "d1", employeeName: "Carlos Gómez", area: "PRODUCCIÓN RIONEGRO", hours: 3, dayDate: null, week: 25, requestedAt: "" },
-  { id: "d2", employeeName: "Diana Torres", area: "CALIDAD RIONEGRO", hours: 5, dayDate: null, week: 25, requestedAt: "" },
-];
-
 const LINKS = [
-  { href: "/demo/dashboard", label: "Dashboard" },
-  { href: "/demo/upload", label: "Cargar CSV" },
-  { href: "/demo/export", label: "Exportar" },
-  { href: "/demo/autorizaciones", label: "Autorizaciones" },
-  { href: "/demo/revisiones", label: "Revisiones" },
-  { href: "/demo/admin", label: "Usuarios" },
+  { href: "/demo/dashboard", label: "Dashboard", rrhh: false },
+  { href: "/demo/upload", label: "Cargar archivo", rrhh: true },
+  { href: "/demo/revisiones", label: "Registros por revisar", rrhh: true },
+  { href: "/demo/export", label: "Exportar a nómina", rrhh: true },
+  { href: "/demo/admin", label: "Usuarios y accesos", rrhh: true },
 ];
 
 export function DemoNav() {
@@ -35,19 +26,12 @@ export function DemoNav() {
   const params = useSearchParams();
   const role = (params.get("rol") as Role) || "rrhh";
   const withRole = (href: string) => `${href}?rol=${role}`;
-  const canApprove = role === "rrhh" || role === "director";
 
   return (
     <aside className="sticky top-0 z-40 flex w-full shrink-0 flex-col border-b border-slate-200 bg-white print:hidden lg:h-screen lg:w-60 lg:overflow-y-auto lg:border-b-0 lg:border-r">
       <div className="border-b border-slate-200 px-4 py-2.5 lg:px-5 lg:py-5">
         <div className="flex items-center justify-between gap-2 lg:items-start">
           <BrandMark size="md" />
-          {canApprove && (
-            <NotificationBell
-              items={DEMO_PENDING}
-              href={`/demo/autorizaciones?rol=${role}`}
-            />
-          )}
         </div>
         <div className="mt-2 hidden text-xs text-slate-500 lg:block">
           Control de Horas Extras
@@ -56,7 +40,7 @@ export function DemoNav() {
       </div>
 
       <nav className="flex gap-1 overflow-x-auto p-2 lg:flex-col lg:gap-0 lg:space-y-1 lg:overflow-visible lg:p-3">
-        {LINKS.map((link) => {
+        {LINKS.filter((l) => !l.rrhh || role === "rrhh").map((link) => {
           const active = pathname === link.href;
           return (
             <Link

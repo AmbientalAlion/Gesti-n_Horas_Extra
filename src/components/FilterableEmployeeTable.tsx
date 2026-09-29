@@ -5,10 +5,13 @@ import { EmployeeTable } from "./EmployeeTable";
 import type { EmployeeStatus } from "@/lib/aggregate";
 import type { SemaphoreLevel } from "@/lib/types";
 
+/** Minúsculas y sin tildes: «gomez» encuentra «Gómez». */
+const norm = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
 const ESTADOS: { value: "" | SemaphoreLevel; label: string }[] = [
   { value: "", label: "Todos los estados" },
-  { value: "red", label: "Crítico" },
-  { value: "yellow", label: "Preventivo" },
+  { value: "red", label: "Excedido" },
+  { value: "yellow", label: "En riesgo" },
   { value: "green", label: "Normal" },
 ];
 
@@ -30,13 +33,14 @@ export function FilterableEmployeeTable({
   const [estado, setEstado] = useState<"" | SemaphoreLevel>("");
 
   const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase();
+    const term = norm(q.trim());
     return rows.filter((r) => {
       if (estado && r.level !== estado) return false;
       if (
         term &&
-        !(r.name ?? "").toLowerCase().includes(term) &&
-        !r.code.toLowerCase().includes(term)
+        !norm(r.name ?? "").includes(term) &&
+        !norm(r.code).includes(term) &&
+        !norm(r.area ?? "").includes(term)
       )
         return false;
       return true;

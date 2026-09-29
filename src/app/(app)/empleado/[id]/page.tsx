@@ -11,7 +11,11 @@ export default async function EmpleadoPage({
   params: { id: string };
   searchParams: Record<string, string | undefined>;
 }) {
-  const detail = await getEmployeeDetail(params.id);
+  const mes = Number(searchParams.mes);
+  const anio = Number(searchParams.anio);
+  const month =
+    mes >= 1 && mes <= 12 && anio >= 2000 && anio <= 2100 ? { year: anio, month: mes } : undefined;
+  const detail = await getEmployeeDetail(params.id, month);
   if (!detail) notFound();
 
   // Vuelve al panel conservando los filtros y el mes con los que se llegó.

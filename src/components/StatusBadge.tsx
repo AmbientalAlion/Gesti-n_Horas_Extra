@@ -1,11 +1,12 @@
 import clsx from "clsx";
 import type { SemaphoreLevel } from "@/lib/types";
 
-const LABELS: Record<SemaphoreLevel, string> = {
+export const LEVEL_LABELS: Record<SemaphoreLevel, string> = {
   green: "Normal",
-  yellow: "Preventivo",
-  red: "Crítico",
+  yellow: "En riesgo",
+  red: "Excedido",
 };
+const LABELS = LEVEL_LABELS;
 
 const STYLES: Record<SemaphoreLevel, string> = {
   green: "bg-green-100 text-green-800 ring-green-600/20",

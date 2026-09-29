@@ -33,13 +33,13 @@ export function segmentMembers(
     case "red":
       return by((s) => s.level === "red").sort((a, b) => b.monthlyOvertime - a.monthlyOvertime);
     case "yellow":
-      return by((s) => s.level === "yellow").sort((a, b) => b.monthlyOvertime - a.monthlyOvertime);
+      // Primero los que van sobre la meta (por cuánto), luego los de proyección.
+      return by((s) => s.level === "yellow").sort(
+        (a, b) =>
+          b.overTarget - a.overTarget || b.projectedMonthlyOvertime - a.projectedMonthlyOvertime
+      );
     case "green":
       return by((s) => s.level === "green").sort((a, b) => b.monthlyOvertime - a.monthlyOvertime);
-    case "atRisk":
-      return by((s) => s.level !== "red" && s.willExceedMonthly).sort(
-        (a, b) => b.projectedMonthlyOvertime - a.projectedMonthlyOvertime
-      );
     case "errors":
       return by((s) => s.hasError);
     case "weeklyHigh":

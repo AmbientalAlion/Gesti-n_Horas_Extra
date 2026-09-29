@@ -2,39 +2,29 @@
 //
 // Fuente: Especificación técnica ALION.
 //  - Jornada base: 42 horas semanales regulares.
-//  - Alerta semanal: > 12 horas extras en una misma semana.
-//  - Límite legal mensual: 48 horas extras al mes.
+//  - Alerta semanal: > 12 horas extras de lunes a domingo (informativa).
+//  - Límite mensual: 48 horas extras. Meta acumulada: 12h por semana,
+//    proporcional en semanas parciales, con tope de 48h.
 //  - Horas huérfanas: turnos de más de 16h seguidas sin marcación de salida ->
 //    el registro se congela y se marca con error (no suma al acumulado).
-//  - Semáforo preventivo: cerca del límite semanal (10h) o mensual (40h).
 
-import type {
-  BiometricRow,
-  MonthProjection,
-  SemaphoreLevel,
-  StatusEvaluation,
-  WeeklyProjection,
-  WeeklyRecord,
-} from "./types";
+import type { BiometricRow, SemaphoreLevel, WeeklyRecord } from "./types";
 
 /** Parámetros legales/operativos. Centralizados para facilitar ajustes. */
 export const RULES = {
   /** Jornada regular semanal (horas). */
   WEEKLY_BASE_HOURS: 42,
-  /** Límite legal de horas extras por semana antes de alerta crítica. */
+  /**
+   * Referencia semanal: 12h extra de lunes a domingo. Superarla genera la
+   * alerta «Semana > 12h» (informativa) y es la meta de una semana completa.
+   */
   WEEKLY_OVERTIME_LIMIT: 12,
-  /** Umbral preventivo de horas extras semanales (amarillo). */
-  WEEKLY_OVERTIME_WARNING: 10,
-  /** Límite legal de horas extras por mes. */
+  /** Límite de horas extras por mes (no puede superarse). */
   MONTHLY_OVERTIME_LIMIT: 48,
-  /** Umbral preventivo de horas extras mensuales (amarillo). */
-  MONTHLY_OVERTIME_WARNING: 40,
+  /** Días de datos a partir de los cuales la proyección cambia el estado. */
+  MIN_DAYS_FOR_PROJECTION: 7,
   /** Duración de turno (horas) a partir de la cual se considera "hora huérfana". */
   ORPHAN_SHIFT_HOURS: 16,
-  /** Días laborales considerados por semana para la proyección (burn rate). */
-  WORKING_DAYS_PER_WEEK: 6,
-  /** Máximo de horas extra por solicitud de autorización. */
-  MAX_AUTHORIZATION_HOURS: 5,
 } as const;
 
 /**
@@ -85,132 +75,137 @@ export function buildWeeklyRecord(
   };
 }
 
-/**
- * Proyección por burn rate a partir de un corte parcial.
- * Estima el total y las extras al cierre de la semana según el promedio diario
- * observado hasta el día del corte.
- *
- * @param hoursSoFar  Horas acumuladas hasta el corte parcial.
- * @param daysElapsed Días transcurridos de la semana incluidos en el corte.
- */
-export function projectWeek(
-  hoursSoFar: number,
-  daysElapsed: number
-): WeeklyProjection {
-  const safeDays = Math.max(1, Math.min(daysElapsed, RULES.WORKING_DAYS_PER_WEEK));
-  const dailyAverage = hoursSoFar / safeDays;
-  const projectedTotalHours = round2(dailyAverage * RULES.WORKING_DAYS_PER_WEEK);
-  const projectedOvertimeHours = calculateWeeklyOvertime(projectedTotalHours);
+/** Redondeo a 1 decimal: la cifra que ve el usuario (RF-09). */
+export function round1(n: number): number {
+  return Math.round((n + Number.EPSILON) * 10) / 10;
+}
 
-  return {
-    dailyAverage: round2(dailyAverage),
-    projectedTotalHours,
-    projectedOvertimeHours,
-    willExceedWeeklyLimit: projectedOvertimeHours > RULES.WEEKLY_OVERTIME_LIMIT,
-  };
+/** «17,0h»: horas con un decimal y coma decimal (es-CO). */
+export function fmtH(n: number): string {
+  return `${round1(n).toFixed(1).replace(".", ",")}h`;
 }
 
 /**
- * Proyección de cierre de MES. Toma las horas extra ya acumuladas y el ritmo
- * observado en las semanas con datos, y lo aplica SOLO a las semanas que le
- * faltan al mes:
- *
- *   proyección = acumulado + (acumulado / semanas cubiertas) × semanas restantes
- *
- * Así nunca queda por debajo de lo ya trabajado (el acumulado es el piso) y
- * respeta que un mes tenga 4 o 5 semanas. En un mes cerrado no hay semanas
- * restantes: la proyección es el acumulado.
- *
- * @param accumulated     Horas extra acumuladas en el mes.
- * @param coveredWeeks    Semanas del mes que ya tienen datos cargados.
- * @param weeksInMonth    Semanas que tiene el mes (4 o 5).
- * @param closed          true si el mes ya terminó.
+ * Meta acumulada al día `d` del mes (RF-07/RF-08): 12h por semana completa,
+ * proporcional por día en las semanas parciales, con tope de 48h. En un mes de
+ * 30 o 31 días la meta llega a 48h el día 28.
  */
-export function projectMonth(
+export function monthlyTarget(d: number): number {
+  if (d <= 0) return 0;
+  return round2(
+    Math.min(
+      RULES.MONTHLY_OVERTIME_LIMIT,
+      (RULES.WEEKLY_OVERTIME_LIMIT * d) / 7
+    )
+  );
+}
+
+/**
+ * Proyección de cierre (RF-18/RF-19): extiende el ritmo diario hasta el final
+ * del mes. Nunca es menor que el acumulado; en un mes cerrado es el acumulado.
+ */
+export function projectClose(
   accumulated: number,
-  coveredWeeks: number,
-  weeksInMonth: number,
+  cutoffDay: number,
+  daysInMonth: number,
   closed = false
-): MonthProjection {
-  const acc = Math.max(0, accumulated);
-  const remaining = closed ? 0 : Math.max(0, weeksInMonth - coveredWeeks);
-  const projected =
-    coveredWeeks > 0 && remaining > 0 ? acc + (acc / coveredWeeks) * remaining : acc;
-  const value = round2(projected);
-  return {
-    weeksElapsed: coveredWeeks,
-    projectedMonthlyOvertime: value,
-    willExceedMonthly: value > RULES.MONTHLY_OVERTIME_LIMIT,
-  };
+): number {
+  const a = Math.max(0, accumulated);
+  if (closed || cutoffDay <= 0 || cutoffDay >= daysInMonth) return round2(a);
+  return round2(Math.max(a, (a * daysInMonth) / cutoffDay));
+}
+
+export type RiskReason = "meta" | "proyeccion" | null;
+
+export interface MonthEvaluation {
+  level: SemaphoreLevel;
+  /** Motivo de «En riesgo» (o null si no lo está). */
+  risk: RiskReason;
+  /** Meta acumulada a la fecha de corte. */
+  target: number;
+  /** Horas por encima de la meta (0 si está dentro). */
+  overTarget: number;
+  projected: number;
+  /** true con al menos 7 días de datos: la proyección puede decidir el estado. */
+  projectionReliable: boolean;
+  reasons: string[];
 }
 
 /**
- * Evalúa el semáforo. Regla ALIÓN: el límite DURO es el MENSUAL (48h). Superar
- * las 12h de una semana está PERMITIDO (solo es informativo); lo que no puede
- * superarse es el acumulado del mes.
- *
- * 🔴 Rojo (crítico): superó las 48h extra del mes.
- * 🟡 Amarillo (preventivo): cerca del límite mensual (>=40h) o la proyección de
- *     cierre lo superaría.
- * 🟢 Verde: operación normal.
+ * Estado del mes (RF-11 a RF-13):
+ *  - Excedido (red): acumulado > 48h.
+ *  - En riesgo (yellow): acumulado > meta a la fecha de corte, o proyección
+ *    > 48h con al menos 7 días de datos.
+ *  - Normal (green): en otro caso.
+ * Las comparaciones usan las cifras redondeadas a 1 decimal, las que se leen.
  */
-export function evaluateStatus(
-  monthlyOvertime: number,
-  projectedMonthlyOvertime: number | null = null,
-  weeklyOvertime = 0
-): StatusEvaluation {
-  const reasons: string[] = [];
+export function evaluateMonth(input: {
+  accumulated: number;
+  cutoffDay: number;
+  daysInMonth: number;
+  closed?: boolean;
+  /** «7 de febrero», para los textos. */
+  cutoffLabel?: string;
+}): MonthEvaluation {
+  const { accumulated, cutoffDay, daysInMonth, closed = false } = input;
+  const at = input.cutoffLabel ? ` al ${input.cutoffLabel}` : "";
+  const a = round1(accumulated);
+  const target = monthlyTarget(cutoffDay);
+  // Se proyecta desde la cifra que se lee, para que estado y texto coincidan.
+  const projected = projectClose(a, cutoffDay, daysInMonth, closed);
+  const projectionReliable = !closed && cutoffDay >= RULES.MIN_DAYS_FOR_PROJECTION;
+  const overTarget = round2(Math.max(0, a - round1(target)));
+  const limit = RULES.MONTHLY_OVERTIME_LIMIT;
 
-  const monthlyExceeded = monthlyOvertime > RULES.MONTHLY_OVERTIME_LIMIT;
-  const monthlyWarning = monthlyOvertime >= RULES.MONTHLY_OVERTIME_WARNING;
-  const willExceedMonthly =
-    projectedMonthlyOvertime != null &&
-    projectedMonthlyOvertime > RULES.MONTHLY_OVERTIME_LIMIT;
-  const weeklyHigh = weeklyOvertime > RULES.WEEKLY_OVERTIME_LIMIT;
-
-  let level: SemaphoreLevel = "green";
-
-  if (monthlyExceeded) {
-    level = "red";
-    reasons.push(
-      `Superó el límite legal mensual: ${round2(monthlyOvertime)}h > ${
-        RULES.MONTHLY_OVERTIME_LIMIT
-      }h.`
-    );
-  } else if (monthlyWarning || willExceedMonthly) {
-    level = "yellow";
-    if (monthlyWarning) {
-      reasons.push(
-        `Cerca del límite mensual: ${round2(monthlyOvertime)}h (umbral ${
-          RULES.MONTHLY_OVERTIME_WARNING
-        }h).`
-      );
-    }
-    if (willExceedMonthly) {
-      reasons.push(
-        `Proyección de cierre: ${round2(
-          projectedMonthlyOvertime as number
-        )}h — superaría las ${RULES.MONTHLY_OVERTIME_LIMIT}h.`
-      );
-    }
-  } else {
-    reasons.push("Operación normal.");
+  if (a > limit) {
+    return {
+      level: "red",
+      risk: null,
+      target,
+      overTarget,
+      projected,
+      projectionReliable,
+      reasons: [`Superó el límite de ${limit}h del mes: lleva ${fmtH(a)}.`],
+    };
   }
-
-  if (weeklyHigh) {
-    reasons.push(
-      `Semana alta: ${round2(weeklyOvertime)}h extra (permitido; el límite es mensual).`
-    );
+  if (overTarget > 0) {
+    return {
+      level: "yellow",
+      risk: "meta",
+      target,
+      overTarget,
+      projected,
+      projectionReliable,
+      reasons: [
+        `${fmtH(overTarget)} por encima de la meta${at}: lleva ${fmtH(a)} y la meta es ${fmtH(target)}.`,
+      ],
+    };
   }
-
+  if (projectionReliable && round1(projected) > limit) {
+    return {
+      level: "yellow",
+      risk: "proyeccion",
+      target,
+      overTarget,
+      projected,
+      projectionReliable,
+      reasons: [
+        `Va dentro de la meta${at}, pero a este ritmo cerraría en ${fmtH(projected)}.`,
+      ],
+    };
+  }
   return {
-    level,
-    reasons,
-    weeklyOvertime: round2(weeklyOvertime),
-    monthlyOvertime: round2(monthlyOvertime),
-    weeklyHigh,
-    monthlyExceeded,
-    willExceedMonthly,
+    level: "green",
+    risk: null,
+    target,
+    overTarget,
+    projected,
+    projectionReliable,
+    reasons: [
+      closed
+        ? `Cerró el mes en ${fmtH(a)}, dentro del límite de ${limit}h.`
+        : `Dentro de la meta${at}.`,
+    ],
   };
 }
 

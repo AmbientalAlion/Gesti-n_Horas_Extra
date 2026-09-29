@@ -4,36 +4,36 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import type { Role } from "@/lib/types";
-import type { PendingAuth } from "@/lib/data";
 import { signOut } from "@/app/login/actions";
 import { BrandMark, Claim } from "@/components/brand/BrandMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { NotificationBell } from "@/components/NotificationBell";
 
 interface NavProps {
   role: Role | "demo";
-  pending?: PendingAuth[];
 }
 
 const ROLE_LABELS: Record<Role | "demo", string> = {
   rrhh: "Recursos Humanos",
-  director: "Director General",
+  director: "Director",
   jefe: "Jefe Inmediato",
   demo: "Modo demostración",
 };
 
-export function Nav({ role, pending = [] }: NavProps) {
+export function Nav({ role }: NavProps) {
   const pathname = usePathname();
   const isRrhh = role === "rrhh" || role === "demo";
-  const canApprove = role === "rrhh" || role === "director";
 
+  // Cargar, exportar, revisar y administrar son acciones de RRHH.
   const links = [
     { href: "/dashboard", label: "Dashboard" },
-    ...(isRrhh ? [{ href: "/upload", label: "Cargar CSV" }] : []),
-    { href: "/export", label: "Exportar" },
-    { href: "/autorizaciones", label: "Autorizaciones" },
-    ...(isRrhh ? [{ href: "/revisiones", label: "Revisiones" }] : []),
-    ...(isRrhh ? [{ href: "/admin", label: "Usuarios" }] : []),
+    ...(isRrhh
+      ? [
+          { href: "/upload", label: "Cargar archivo" },
+          { href: "/revisiones", label: "Registros por revisar" },
+          { href: "/export", label: "Exportar a nómina" },
+          { href: "/admin", label: "Usuarios y accesos" },
+        ]
+      : []),
   ];
 
   return (
@@ -41,9 +41,6 @@ export function Nav({ role, pending = [] }: NavProps) {
       <div className="border-b border-slate-200 px-4 py-2.5 lg:px-5 lg:py-5">
         <div className="flex items-center justify-between gap-2 lg:items-start">
           <BrandMark size="md" />
-          {canApprove && (
-            <NotificationBell items={pending} href="/autorizaciones" />
-          )}
         </div>
         {/* En teléfono el encabezado se reduce para no comerse la pantalla. */}
         <div className="mt-2 hidden text-xs text-slate-500 lg:block">
