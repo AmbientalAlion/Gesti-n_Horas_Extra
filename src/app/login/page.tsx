@@ -50,14 +50,19 @@ export default function LoginPage({
             <form action={login} className="card space-y-4">
               {searchParams.error && (
                 <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {searchParams.error}
+                  {searchParams.error === "credenciales"
+                    ? "Usuario o contraseña incorrectos."
+                    : "No se pudo iniciar sesión. Inténtelo de nuevo."}
                 </p>
               )}
               <label className="block text-sm">
-                <span className="mb-1 block text-slate-600">Correo</span>
+                <span className="mb-1 block text-slate-600">Correo o usuario</span>
                 <input
                   name="email"
-                  type="email"
+                  type="text"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   required
                   className="w-full rounded-lg border border-slate-300 px-3 py-2"
                 />
@@ -67,6 +72,7 @@ export default function LoginPage({
                 <input
                   name="password"
                   type="password"
+                  autoComplete="current-password"
                   required
                   className="w-full rounded-lg border border-slate-300 px-3 py-2"
                 />
