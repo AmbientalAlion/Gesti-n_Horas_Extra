@@ -64,19 +64,29 @@ export const getSessionProfile = cache(async (): Promise<SessionProfile | null> 
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role, must_change_password, access_roles(name)")
+    .select("id, email, full_name, role, must_change_password, access_role_id")
     .eq("id", user.id)
     .single();
 
   if (!profile) return null;
-  const ar = (profile as any).access_roles;
+  // El nombre del rol se lee aparte: si esa consulta falla, el usuario
+  // conserva su acceso (el nivel ya viene en profile.role).
+  let roleName: string | null = null;
+  if (profile.access_role_id) {
+    const { data: ar } = await supabase
+      .from("access_roles")
+      .select("name")
+      .eq("id", profile.access_role_id)
+      .maybeSingle();
+    roleName = ar?.name ?? null;
+  }
   return {
     id: profile.id,
     email: profile.email,
     fullName: profile.full_name,
     role: (profile.role as Role | null) ?? null,
-    roleName: (Array.isArray(ar) ? ar[0]?.name : ar?.name) ?? null,
-    mustChangePassword: Boolean((profile as any).must_change_password),
+    roleName,
+    mustChangePassword: Boolean(profile.must_change_password),
   };
 });
 

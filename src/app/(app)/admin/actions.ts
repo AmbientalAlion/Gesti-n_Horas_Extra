@@ -135,7 +135,7 @@ export async function assignRole(_prev: ActionState, formData: FormData): Promis
   }
   const { data: before } = await supabase
     .from("profiles")
-    .select("access_role_id, access_roles(name)")
+    .select("access_role_id, access_roles!profiles_access_role_id_fkey(name)")
     .eq("id", id)
     .single();
   const { error } = await supabase.from("profiles").update({ access_role_id: roleId }).eq("id", id);
