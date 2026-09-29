@@ -70,7 +70,9 @@ create policy "Lectura de empleados según alcance"
   on public.employees for select
   using (public.can_see_employee(direccion, manager_id));
 
+-- En producción el nombre quedó sin tilde; se eliminan ambas variantes.
 drop policy if exists "Lectura de registros según alcance" on public.weekly_records;
+drop policy if exists "Lectura de registros segun alcance" on public.weekly_records;
 create policy "Lectura de registros según alcance"
   on public.weekly_records for select
   using (
