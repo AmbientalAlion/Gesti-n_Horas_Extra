@@ -10,6 +10,7 @@ import {
   sumOvertime,
 } from "./overtime";
 import type { SemaphoreLevel, WeeklyRecord } from "./types";
+import { coveredWeeks, weeksOfMonth, type MonthStatus } from "./dates";
 
 export interface EmployeeInput {
   id: string;
@@ -33,9 +34,19 @@ export interface EmployeeStatus extends EmployeeInput {
   availableMonthly: number;
   level: SemaphoreLevel;
   reasons: string[];
-  /** Informativo: superó 12h en la semana (permitido). */
+  /** Informativo: superó 12h en la semana de referencia (permitido). */
   weeklyHigh: boolean;
+  /** Semanas del mes por encima de 12h (informativo, permitido). */
+  highWeeksMonth: number;
+  /** true si tiene registros congelados del mes AÚN SIN REVISAR. */
   hasError: boolean;
+  /** Número de registros congelados del mes sin revisar. */
+  pendingReviewCount: number;
+  /**
+   * Horas extra del mes si los registros pendientes se validaran tal como
+   * llegaron (cota superior). Igual a monthlyOvertime si no hay pendientes.
+   */
+  potentialMonthlyOvertime: number;
   /** Proyección de la semana actual si el último corte es parcial. */
   projectedWeeklyOvertime?: number;
   willExceedWeekly?: boolean;
@@ -109,27 +120,42 @@ export interface PlantSummary {
   red: number;
   withErrors: number;
   totalMonthlyOvertime: number;
-  /** Semanas por encima de 12h (informativo, permitido). */
+  /** Semanas de más de 12h en el mes, sumadas entre personas (informativo). */
   weeklyHigh: number;
+  /** Personas con al menos una semana de más de 12h en el mes. */
+  weeklyHighPeople: number;
   /** Empleados cuya proyección superaría 48h en el mes (aún no en rojo). */
   atRiskMonthly: number;
 }
 
 export interface Period {
+  /** Año ISO de la semana (= año del mes de imputación). */
   year: number;
+  /** Mes de imputación (mes del jueves de la semana). */
   month: number;
+  /** Semana de referencia: la actual, o la última si el mes está cerrado. */
   week: number;
+  /** Estado del mes frente a hoy. Sin valor se asume abierto. */
+  status?: MonthStatus;
+  /** Semanas que tiene el mes (4 o 5). Se calcula si no viene. */
+  weeksInMonth?: number;
+  /** Semanas del mes con datos cargados (del conjunto). Se calcula si no viene. */
+  coveredWeeks?: number;
 }
 
 export interface HistoryEntry {
   year: number;
   week: number;
   month: number;
-  totalHours: number;
-  baseHours: number;
+  /** null cuando el origen no trae horas totales (formato de novedades). */
+  totalHours: number | null;
+  baseHours: number | null;
   overtimeHours: number;
+  /** Horas extra válidas acumuladas en su mes hasta esta semana (incluida). */
+  monthToDate: number;
   isPartial: boolean;
   hasError: boolean;
+  reviewStatus?: "corregido" | "descartado";
   errorReason?: string;
   maxShiftHours?: number;
   isCurrentMonth: boolean;
@@ -143,7 +169,12 @@ export interface EmployeeDetail {
   weeklyHigh: boolean;
   monthlyExceeded: boolean;
   hasError: boolean;
+  /** Registros del mes congelados y todavía sin revisar. */
   frozenCount: number;
+  /** Extra del mes si los registros por revisar se validaran tal cual. */
+  potentialMonthlyOvertime: number;
+  /** Semanas del mes con más de 12h extra (informativo). */
+  highWeeksMonth: number;
 
   weeklyOvertime: number;
   monthlyOvertime: number;
@@ -154,8 +185,9 @@ export interface EmployeeDetail {
   weeklyConsumptionPct: number;
   monthlyConsumptionPct: number;
 
-  totalHoursMonth: number;
-  baseHoursMonth: number;
+  /** null si el mes solo tiene registros sin horas totales (novedades). */
+  totalHoursMonth: number | null;
+  baseHoursMonth: number | null;
   extraHoursMonth: number;
   avgWeeklyOvertime: number;
   weeksWorkedMonth: number;
@@ -197,12 +229,20 @@ export function buildEmployeeDetail(
   );
   const validMonth = monthRecords.filter((r) => !r.hasError);
 
-  const totalHoursMonth = round2(
-    validMonth.reduce((a, r) => a + r.totalHours, 0)
-  );
-  const baseHoursMonth = round2(
-    validMonth.reduce((a, r) => a + Math.min(r.totalHours, RULES.WEEKLY_BASE_HOURS), 0)
-  );
+  // Solo los registros que traen horas totales permiten hablar de «total
+  // trabajado» y «horas base»; el formato de novedades no las trae.
+  const withTotals = validMonth.filter((r) => hasTotals(r));
+  const totalHoursMonth = withTotals.length
+    ? round2(withTotals.reduce((a, r) => a + r.totalHours, 0))
+    : null;
+  const baseHoursMonth = withTotals.length
+    ? round2(
+        withTotals.reduce(
+          (a, r) => a + Math.min(r.totalHours, RULES.WEEKLY_BASE_HOURS),
+          0
+        )
+      )
+    : null;
   const extraHoursMonth = status.monthlyOvertime;
   const weeksWorkedMonth = validMonth.length;
   const avgWeeklyOvertime = weeksWorkedMonth
@@ -240,19 +280,32 @@ export function buildEmployeeDetail(
     trend = trendDelta > 0.01 ? "up" : trendDelta < -0.01 ? "down" : "flat";
   }
 
-  const historyEntries: HistoryEntry[] = sorted.map((r) => ({
-    year: r.year,
-    week: r.week,
-    month: r.month,
-    totalHours: r.totalHours,
-    baseHours: r.hasError ? 0 : round2(Math.min(r.totalHours, RULES.WEEKLY_BASE_HOURS)),
-    overtimeHours: r.overtimeHours,
-    isPartial: r.isPartial,
-    hasError: r.hasError,
-    errorReason: r.errorReason,
-    maxShiftHours: r.maxShiftHours,
-    isCurrentMonth: r.year === period.year && r.month === period.month,
-  }));
+  const running = new Map<string, number>();
+  const historyEntries: HistoryEntry[] = sorted.map((r) => {
+    const key = `${r.year}-${r.month}`;
+    const acc = round2((running.get(key) ?? 0) + (r.hasError ? 0 : r.overtimeHours));
+    running.set(key, acc);
+    const totals = hasTotals(r);
+    return {
+      year: r.year,
+      week: r.week,
+      month: r.month,
+      totalHours: totals ? r.totalHours : null,
+      baseHours: !totals
+        ? null
+        : r.hasError
+          ? 0
+          : round2(Math.min(r.totalHours, RULES.WEEKLY_BASE_HOURS)),
+      overtimeHours: r.overtimeHours,
+      monthToDate: acc,
+      isPartial: r.isPartial,
+      hasError: r.hasError,
+      reviewStatus: r.reviewStatus,
+      errorReason: r.errorReason,
+      maxShiftHours: r.maxShiftHours,
+      isCurrentMonth: r.year === period.year && r.month === period.month,
+    };
+  });
 
   // Ranking dentro del área (por horas extra del mes).
   const areaPeers = peers
@@ -281,7 +334,9 @@ export function buildEmployeeDetail(
     weeklyHigh: status.weeklyHigh,
     monthlyExceeded: status.monthlyOvertime > RULES.MONTHLY_OVERTIME_LIMIT,
     hasError: status.hasError,
-    frozenCount: monthRecords.filter((r) => r.hasError).length,
+    frozenCount: status.pendingReviewCount,
+    potentialMonthlyOvertime: status.potentialMonthlyOvertime,
+    highWeeksMonth: status.highWeeksMonth,
     weeklyOvertime: status.weeklyOvertime,
     monthlyOvertime: status.monthlyOvertime,
     availableWeekly,
@@ -316,6 +371,10 @@ export function computeEmployeeStatuses(
   period: Period
 ): EmployeeStatus[] {
   const byEmployee = groupBy(records, (r) => r.employeeId);
+  const weeksInMonth =
+    period.weeksInMonth ?? weeksOfMonth(period.year, period.month).length;
+  const covered = period.coveredWeeks ?? coveredWeeks(records, period.year, period.month);
+  const closed = period.status === "cerrado";
 
   return employees.map((emp) => {
     const empRecords = byEmployee.get(emp.id) ?? [];
@@ -329,12 +388,25 @@ export function computeEmployeeStatuses(
 
     const weeklyOvertime = weekRecord?.hasError ? 0 : weekRecord?.overtimeHours ?? 0;
     const monthlyOvertime = sumOvertime(monthRecords);
-    const hasError = monthRecords.some((r) => r.hasError);
+    // Pendiente = congelado y todavía sin revisar. Un registro descartado ya
+    // se revisó: no suma, pero tampoco bloquea a la persona.
+    const pending = monthRecords.filter((r) => r.hasError && !r.reviewStatus);
+    const hasError = pending.length > 0;
+    const potentialExtra = round2(
+      pending.reduce(
+        (a, r) => a + Math.max(0, r.totalHours - RULES.WEEKLY_BASE_HOURS),
+        0
+      )
+    );
+    const potentialMonthlyOvertime = round2(monthlyOvertime + potentialExtra);
+    const highWeeksMonth = monthRecords.filter(
+      (r) => !r.hasError && r.overtimeHours > RULES.WEEKLY_OVERTIME_LIMIT
+    ).length;
     const validMonth = monthRecords.filter((r) => !r.hasError);
 
     let projectedWeeklyOvertime: number | undefined;
     let willExceedWeekly: boolean | undefined;
-    if (weekRecord?.isPartial && !weekRecord.hasError) {
+    if (weekRecord?.isPartial && !weekRecord.hasError && hasTotals(weekRecord)) {
       // Corte parcial: proyectamos asumiendo el promedio observado.
       // Sin días explícitos, estimamos con la mitad de la semana laboral.
       const daysElapsed = Math.max(1, Math.round(RULES.WORKING_DAYS_PER_WEEK / 2));
@@ -354,13 +426,35 @@ export function computeEmployeeStatuses(
       overtimeForProjection =
         monthlyOvertime - weekRecord.overtimeHours + projectedWeeklyOvertime;
     }
-    const monthProj = projectMonth(overtimeForProjection, validMonth.length);
+    // Ritmo del conjunto (semanas cubiertas), no de las semanas con registro de
+    // esta persona: quien no tiene registro en una semana cubierta hizo 0h.
+    const monthProj = projectMonth(
+      Math.max(overtimeForProjection, monthlyOvertime),
+      covered,
+      weeksInMonth,
+      closed
+    );
 
     const status = evaluateStatus(
       monthlyOvertime,
       monthProj.projectedMonthlyOvertime,
       weeklyOvertime
     );
+
+    // Con registros por revisar, «Operación normal» sería falso: se explica.
+    let reasons = status.reasons;
+    if (hasError) {
+      reasons = reasons.filter((r) => r !== "Operación normal.");
+      const n = pending.length;
+      reasons.push(
+        `Tiene ${n} registro${n > 1 ? "s" : ""} congelado${n > 1 ? "s" : ""} por revisar. ` +
+          `Si se validaran tal como llegaron, sumaría ≈${potentialMonthlyOvertime}h en el mes` +
+          (potentialMonthlyOvertime > RULES.MONTHLY_OVERTIME_LIMIT &&
+          monthlyOvertime <= RULES.MONTHLY_OVERTIME_LIMIT
+            ? `, por encima del límite de ${RULES.MONTHLY_OVERTIME_LIMIT}h.`
+            : ".")
+      );
+    }
 
     return {
       ...emp,
@@ -370,9 +464,12 @@ export function computeEmployeeStatuses(
         Math.max(0, RULES.MONTHLY_OVERTIME_LIMIT - monthlyOvertime)
       ),
       level: status.level,
-      reasons: status.reasons,
+      reasons,
       weeklyHigh: status.weeklyHigh,
+      highWeeksMonth,
       hasError,
+      pendingReviewCount: pending.length,
+      potentialMonthlyOvertime,
       projectedWeeklyOvertime,
       willExceedWeekly,
       projectedMonthlyOvertime: monthProj.projectedMonthlyOvertime,
@@ -392,7 +489,8 @@ export function summarize(statuses: EmployeeStatus[]): PlantSummary {
     totalMonthlyOvertime: round2(
       statuses.reduce((acc, s) => acc + s.monthlyOvertime, 0)
     ),
-    weeklyHigh: statuses.filter((s) => s.weeklyHigh).length,
+    weeklyHigh: statuses.reduce((a, s) => a + s.highWeeksMonth, 0),
+    weeklyHighPeople: statuses.filter((s) => s.highWeeksMonth > 0).length,
     atRiskMonthly: statuses.filter(
       (s) => s.level !== "red" && s.willExceedMonthly
     ).length,
@@ -446,6 +544,10 @@ export interface EmployeeWeek {
   week: number;
   overtime: number;
   hasError: boolean;
+  /** Horas brutas cargadas (solo relevante si la semana está congelada). */
+  grossHours?: number;
+  /** true si el registro congelado ya se revisó (descartado). */
+  reviewed?: boolean;
 }
 
 export interface DashboardCharts {
@@ -572,6 +674,8 @@ export function computeDashboardCharts(
       week: r.week,
       overtime: r.hasError ? 0 : r.overtimeHours,
       hasError: r.hasError,
+      grossHours: r.hasError ? r.totalHours : undefined,
+      reviewed: r.hasError ? !!r.reviewStatus : undefined,
     });
   }
   for (const k of Object.keys(weeksByEmployee)) {
@@ -588,6 +692,11 @@ export function computeDashboardCharts(
     heatmap,
     reincidentes,
   };
+}
+
+/** El registro trae horas totales reales (no es del formato de novedades). */
+export function hasTotals(r: WeeklyRecord): boolean {
+  return r.source !== "novedades";
 }
 
 function groupBy<T, K>(items: T[], key: (item: T) => K): Map<K, T[]> {

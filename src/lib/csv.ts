@@ -6,6 +6,7 @@
 
 import Papa from "papaparse";
 import type { BiometricRow } from "./types";
+import { weekInfo } from "./dates";
 
 export interface ParsedCsv {
   rows: BiometricRow[];
@@ -113,79 +114,21 @@ export function parseBiometricCsv(content: string): ParsedCsv {
   return { rows, errors };
 }
 
-/** Genera el contenido CSV limpio para exportar a nómina. */
-export function buildPayrollCsv(
-  rows: Array<{
-    employeeId: string;
-    name?: string;
-    area?: string;
-    year: number;
-    month: number;
-    week: number;
-    overtimeHours: number;
-    status: string;
-  }>
-): string {
-  const header = [
-    "ID_Empleado",
-    "Nombre",
-    "Area",
-    "Anio",
-    "Mes",
-    "Semana",
-    "Horas_Extra",
-    "Estado",
-  ];
-  const lines = rows.map((r) =>
-    [
-      r.employeeId,
-      r.name ?? "",
-      r.area ?? "",
-      r.year,
-      r.month,
-      r.week,
-      r.overtimeHours,
-      r.status,
-    ]
-      .map(csvEscape)
-      .join(",")
-  );
-  return [header.join(","), ...lines].join("\n");
-}
-
-function csvEscape(value: string | number): string {
-  const s = String(value);
-  if (s.includes(",") || s.includes('"') || s.includes("\n")) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
-  return s;
-}
-
 /**
- * Calcula año y semana ISO 8601 a partir de una fecha.
- * La semana 1 es la que contiene el primer jueves del año.
+ * Año y semana ISO 8601 de una fecha (la semana 1 contiene el primer jueves).
+ * Delegado en src/lib/dates.ts para que toda la app use el mismo calendario.
  */
 export function isoWeek(date: Date): { year: number; week: number } {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7; // lunes=1..domingo=7
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return { year: d.getUTCFullYear(), week };
+  const { year, week } = isoWeekInfo(date);
+  return { year, week };
 }
 
 /**
- * Año, semana y mes ISO. El mes es el del jueves de esa semana (mes al que se
- * imputa la semana para el consolidado mensual).
+ * Año, semana y mes de imputación (mes del jueves) de una fecha civil.
+ * Usa la fecha tal como viene en el archivo (día/mes/año), sin zona horaria.
  */
 export function isoWeekInfo(date: Date): { year: number; week: number; month: number } {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum); // jueves de la semana
-  const year = d.getUTCFullYear();
-  const yearStart = new Date(Date.UTC(year, 0, 1));
-  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return { year, week, month: d.getUTCMonth() + 1 };
+  return weekInfo({ y: date.getFullYear(), m: date.getMonth() + 1, d: date.getDate() });
 }
 
 // ---------- Formato real de horas extra (export biométrico ALIÓN) ----------

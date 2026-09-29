@@ -33,6 +33,16 @@ export interface WeeklyRecord {
   hasError: boolean;
   errorReason?: string;
   maxShiftHours?: number;
+  /**
+   * Resultado de la revisión de un registro congelado. Sin valor = pendiente.
+   * "descartado" sigue con hasError (no suma) pero ya NO está por revisar.
+   */
+  reviewStatus?: "corregido" | "descartado";
+  /**
+   * Origen del registro. "novedades" solo trae horas extra por recargo: no hay
+   * horas totales ni turno máximo (totalHours llega en 0 y no se muestra).
+   */
+  source?: "biometrico" | "novedades";
 }
 
 export interface WeeklyProjection {

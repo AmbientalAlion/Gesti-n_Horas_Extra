@@ -2,7 +2,7 @@ import Link from "next/link";
 import clsx from "clsx";
 import type { EmployeeDetail as Detail } from "@/lib/aggregate";
 import { RULES } from "@/lib/overtime";
-import { StatusBadge } from "./StatusBadge";
+import { PendingIcon, StatusBadge } from "./StatusBadge";
 import { BudgetBar } from "./BudgetBar";
 import { PrintButton } from "./PrintButton";
 import { FigureCluster } from "./brand/Figures";
@@ -12,10 +12,24 @@ const MONTHS = [
   "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ];
 
+// Neutra: hacer más horas que la semana previa no incumple nada por sí solo.
 const TREND: Record<Detail["trend"], { icon: string; label: string; cls: string }> = {
-  up: { icon: "▲", label: "más que la semana previa", cls: "text-status-red" },
-  down: { icon: "▼", label: "menos que la semana previa", cls: "text-status-green" },
-  flat: { icon: "▬", label: "sin cambio", cls: "text-slate-500" },
+  up: { icon: "▲", label: "más que la semana previa", cls: "text-brand-dark" },
+  down: { icon: "▼", label: "menos que la semana previa", cls: "text-brand-dark" },
+  flat: { icon: "▬", label: "sin cambio", cls: "text-slate-600" },
+};
+
+/** Color del acumulado mensual según los umbrales del límite legal. */
+function monthCls(h: number): string {
+  if (h > RULES.MONTHLY_OVERTIME_LIMIT) return "text-status-red";
+  if (h >= RULES.MONTHLY_OVERTIME_WARNING) return "text-status-yellow";
+  return "text-slate-700";
+}
+
+const LEGAL: Record<Detail["level"], { label: string; cls: string }> = {
+  red: { label: "Crítico", cls: "text-status-red" },
+  yellow: { label: "Preventivo", cls: "text-status-yellow" },
+  green: { label: "Normal", cls: "text-status-green" },
 };
 
 export function EmployeeDetailView({
@@ -46,7 +60,7 @@ export function EmployeeDetailView({
               <h1 className="text-2xl font-bold text-brand-dark">
                 {d.employee.name ?? d.employee.code}
               </h1>
-              <StatusBadge level={d.level} />
+              <StatusBadge level={d.level} pending={d.frozenCount} />
             </div>
             <p className="mt-1 text-sm text-slate-500">
               {d.employee.roleTitle ?? "—"} · ID {d.employee.code} ·{" "}
@@ -90,7 +104,9 @@ export function EmployeeDetailView({
       <section className="grid gap-4 md:grid-cols-2">
         <div className="card border-brand/30">
           <p className="text-sm font-medium text-brand-dark">
-            Horas extra disponibles este mes (límite legal 48h)
+            {d.monthlyExceeded
+              ? `Límite mensual superado (${RULES.MONTHLY_OVERTIME_LIMIT}h)`
+              : `Horas extra disponibles este mes (límite legal ${RULES.MONTHLY_OVERTIME_LIMIT}h)`}
           </p>
           <div className="mt-3">
             <BudgetBar
@@ -102,20 +118,31 @@ export function EmployeeDetailView({
           <p className="mt-2 text-xs text-slate-500">
             Este es el límite que no puede superarse.
           </p>
+          {d.frozenCount > 0 && (
+            <p className="mt-2 rounded-md bg-violet-50 px-2 py-1.5 text-xs text-violet-800">
+              {d.frozenCount} registro{d.frozenCount > 1 ? "s" : ""} por revisar: según
+              se resuelva{d.frozenCount > 1 ? "n" : ""}, el mes quedaría entre{" "}
+              {d.monthlyOvertime.toFixed(1)}h y ≈{d.potentialMonthlyOvertime.toFixed(1)}h.
+            </p>
+          )}
         </div>
         <div className="card">
           <p className="text-sm font-medium text-slate-600">
-            Horas extra de la semana (referencia)
+            Horas extra de la semana {d.period.week} (referencia{" "}
+            {RULES.WEEKLY_OVERTIME_LIMIT}h)
           </p>
           <div className="mt-3">
             <BudgetBar
               used={d.weeklyOvertime}
               limit={RULES.WEEKLY_OVERTIME_LIMIT}
               warning={RULES.WEEKLY_OVERTIME_WARNING}
+              mode="reference"
             />
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            Superar 12h en una semana está permitido; es solo informativo.
+            {d.highWeeksMonth > 0
+              ? `${d.highWeeksMonth} semana${d.highWeeksMonth > 1 ? "s" : ""} de más de ${RULES.WEEKLY_OVERTIME_LIMIT}h este mes. Está permitido; solo cuenta el total del mes.`
+              : `Superar ${RULES.WEEKLY_OVERTIME_LIMIT}h en una semana está permitido; solo cuenta el total del mes.`}
           </p>
         </div>
       </section>
@@ -127,12 +154,20 @@ export function EmployeeDetailView({
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
           <Metric label="Extra del mes" value={`${d.extraHoursMonth.toFixed(1)}h`} />
-          <Metric label="Horas base" value={`${d.baseHoursMonth.toFixed(1)}h`} />
-          <Metric label="Total trabajado" value={`${d.totalHoursMonth.toFixed(1)}h`} />
+          <Metric
+            label="Horas base"
+            value={d.baseHoursMonth != null ? `${d.baseHoursMonth.toFixed(1)}h` : "—"}
+            hint={d.baseHoursMonth == null ? "el archivo de novedades no las trae" : undefined}
+          />
+          <Metric
+            label="Total trabajado"
+            value={d.totalHoursMonth != null ? `${d.totalHoursMonth.toFixed(1)}h` : "—"}
+            hint={d.totalHoursMonth == null ? "el archivo de novedades no lo trae" : undefined}
+          />
           <Metric
             label="Promedio semanal"
             value={`${d.avgWeeklyOvertime.toFixed(1)}h`}
-            hint={`${d.weeksWorkedMonth} semanas`}
+            hint={`${d.weeksWorkedMonth} semana${d.weeksWorkedMonth === 1 ? "" : "s"} con registro`}
           />
         </div>
       </section>
@@ -174,25 +209,24 @@ export function EmployeeDetailView({
           </div>
         )}
         <div className="card">
-          <p className="text-sm text-slate-500">Cumplimiento legal</p>
+          <p className="text-sm text-slate-500">Estado frente al límite mensual</p>
+          <p className={clsx("mt-1 text-lg font-semibold", LEGAL[d.level].cls)}>
+            {LEGAL[d.level].label}
+            {d.level === "red" && " · superó 48h"}
+            {d.level === "yellow" &&
+              (d.monthlyOvertime >= RULES.MONTHLY_OVERTIME_WARNING
+                ? " · cerca de 48h"
+                : " · por proyección")}
+          </p>
           <p
             className={clsx(
-              "mt-1 text-lg font-semibold",
-              d.monthlyExceeded
-                ? "text-status-red"
-                : d.willExceedMonthly
-                  ? "text-status-yellow"
-                  : "text-status-green"
+              "text-xs",
+              d.frozenCount > 0 ? "font-medium text-violet-700" : "text-slate-500"
             )}
           >
-            {d.monthlyExceeded
-              ? "Excedido"
-              : d.willExceedMonthly
-                ? "En riesgo"
-                : "En regla"}
-          </p>
-          <p className="text-xs text-slate-500">
-            {d.frozenCount > 0 ? `${d.frozenCount} registro(s) por revisar` : "Sin novedades"}
+            {d.frozenCount === 1
+              ? "1 registro por revisar"
+              : `${d.frozenCount} registros por revisar`}
           </p>
         </div>
         </div>
@@ -231,6 +265,11 @@ export function EmployeeDetailView({
                 <th className="px-4 py-3 text-right font-medium">Total</th>
                 <th className="px-4 py-3 text-right font-medium">Base</th>
                 <th className="px-4 py-3 text-right font-medium">Extra</th>
+                <th className="px-4 py-3 text-right font-medium">
+                  <abbr title="Horas extra válidas acumuladas en el mes hasta esa semana; se colorea frente al límite de 48h" className="no-underline">
+                    Acumulado del mes
+                  </abbr>
+                </th>
                 <th className="px-4 py-3 font-medium">Corte</th>
                 <th className="px-4 py-3 font-medium">Estado</th>
               </tr>
@@ -238,7 +277,7 @@ export function EmployeeDetailView({
             <tbody className="divide-y divide-slate-100">
               {d.history.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
+                  <td colSpan={8} className="px-4 py-6 text-center text-slate-500">
                     Sin registros cargados.
                   </td>
                 </tr>
@@ -247,7 +286,7 @@ export function EmployeeDetailView({
                 <tr
                   key={`${h.year}-${h.week}`}
                   className={clsx(
-                    h.hasError && "bg-amber-50",
+                    h.hasError && !h.reviewStatus && "bg-violet-50",
                     h.week === d.period.week && h.isCurrentMonth && "bg-brand-tint"
                   )}
                 >
@@ -258,30 +297,54 @@ export function EmployeeDetailView({
                     )}
                   </td>
                   <td className="px-4 py-2 text-slate-500">{MONTHS[h.month - 1]}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{h.totalHours.toFixed(1)}h</td>
+                  <td className="px-4 py-2 text-right tabular-nums">
+                    {h.totalHours != null ? `${h.totalHours.toFixed(1)}h` : "—"}
+                  </td>
                   <td className="px-4 py-2 text-right tabular-nums text-slate-500">
-                    {h.baseHours.toFixed(1)}h
+                    {h.baseHours != null ? `${h.baseHours.toFixed(1)}h` : "—"}
+                  </td>
+                  <td className="px-4 py-2 text-right font-medium tabular-nums text-slate-700">
+                    {h.hasError ? (
+                      <span className="text-xs font-normal text-slate-500">sin validar</span>
+                    ) : (
+                      <>
+                        {h.overtimeHours.toFixed(1)}h
+                        {h.overtimeHours > RULES.WEEKLY_OVERTIME_LIMIT && (
+                          <span
+                            className="ml-1.5 rounded bg-slate-100 px-1 py-0.5 text-[11px] font-normal text-slate-600"
+                            title={`Más de ${RULES.WEEKLY_OVERTIME_LIMIT}h en la semana: permitido, informativo`}
+                          >
+                            &gt;{RULES.WEEKLY_OVERTIME_LIMIT}h
+                          </span>
+                        )}
+                      </>
+                    )}
                   </td>
                   <td
                     className={clsx(
-                      "px-4 py-2 text-right font-medium tabular-nums",
-                      h.overtimeHours > RULES.WEEKLY_OVERTIME_LIMIT
-                        ? "text-status-red"
-                        : h.overtimeHours >= RULES.WEEKLY_OVERTIME_WARNING
-                          ? "text-status-yellow"
-                          : "text-slate-700"
+                      "px-4 py-2 text-right font-semibold tabular-nums",
+                      monthCls(h.monthToDate)
                     )}
                   >
-                    {h.overtimeHours.toFixed(1)}h
+                    {h.monthToDate.toFixed(1)}h
                   </td>
                   <td className="px-4 py-2 text-xs text-slate-500">
                     {h.isPartial ? "Parcial" : "Final"}
                   </td>
                   <td className="px-4 py-2">
-                    {h.hasError ? (
-                      <span className="text-xs text-amber-700" title={h.errorReason}>
-                        ⚠ Congelado
+                    {h.hasError && !h.reviewStatus ? (
+                      <span
+                        className="inline-flex items-center gap-1 text-xs font-medium text-violet-700"
+                        title={h.errorReason}
+                      >
+                        <PendingIcon /> Por revisar
                       </span>
+                    ) : h.reviewStatus === "descartado" ? (
+                      <span className="text-xs text-slate-500" title={h.errorReason}>
+                        Descartado
+                      </span>
+                    ) : h.reviewStatus === "corregido" ? (
+                      <span className="text-xs text-green-700">Corregido</span>
                     ) : (
                       <span className="text-xs text-green-700">OK</span>
                     )}
@@ -292,8 +355,9 @@ export function EmployeeDetailView({
           </table>
         </div>
         <p className="mt-2 text-xs text-slate-500">
-          Los datos del archivo biométrico son semanales (no hay marcación diaria).
-          La franja diaria y el desglose diurno/nocturno permitirían mayor detalle.
+          «Extra» es informativo por semana; el color del «Acumulado del mes» es el
+          que cuenta frente al límite legal de {RULES.MONTHLY_OVERTIME_LIMIT}h. «—»:
+          el archivo de novedades solo trae horas extra, no horas totales.
         </p>
       </section>
     </div>

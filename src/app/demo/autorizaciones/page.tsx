@@ -1,12 +1,7 @@
 import { WeekDayPicker, type WeekDayOpt } from "@/components/WeekDayPicker";
+import { MONTHS, currentPeriodInfo, plantWeekDays } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
-
-const MONTHS = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-];
-const DOW = ["L", "M", "M", "J", "V", "S", "D"];
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   solicitada: { label: "Solicitada", cls: "text-status-yellow" },
@@ -14,27 +9,8 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   rechazada: { label: "Rechazada", cls: "text-status-red" },
 };
 
-function iso(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
-  ).padStart(2, "0")}`;
-}
-
 function weekDays(): { days: WeekDayOpt[]; selected: string[] } {
-  const now = new Date();
-  const dow = now.getDay() || 7;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - (dow - 1));
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return {
-      date: iso(d),
-      dow: DOW[i],
-      day: d.getDate(),
-      isToday: d.toDateString() === now.toDateString(),
-    };
-  });
+  const days = plantWeekDays();
   // Selección de ejemplo: L–V (semana laboral).
   return { days, selected: days.slice(0, 5).map((d) => d.date) };
 }
@@ -46,8 +22,7 @@ const DEMO_AUTHS = [
 ];
 
 export default function DemoAutorizaciones() {
-  const now = new Date();
-  const month = now.getMonth() + 1;
+  const cur = currentPeriodInfo();
   const { days, selected } = weekDays();
 
   return (
@@ -73,9 +48,9 @@ export default function DemoAutorizaciones() {
           days={days}
           selected={selected}
           readOnly
-          weekNumber={25}
-          monthLabel={MONTHS[month - 1]}
-          year={now.getFullYear()}
+          weekNumber={cur.week}
+          monthLabel={MONTHS[cur.month - 1]}
+          year={cur.year}
         />
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="text-sm">

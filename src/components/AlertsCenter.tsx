@@ -43,9 +43,9 @@ const TABS: {
     label: "Por revisar",
     one: "por revisar",
     empty: "No hay registros congelados por horas huérfanas.",
-    accent: "border-l-amber-500",
-    pill: "bg-amber-100 text-amber-800",
-    dot: "bg-amber-500",
+    accent: "border-l-violet-500",
+    pill: "bg-violet-100 text-violet-800",
+    dot: "bg-violet-500",
   },
 ];
 

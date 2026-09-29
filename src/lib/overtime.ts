@@ -33,8 +33,6 @@ export const RULES = {
   ORPHAN_SHIFT_HOURS: 16,
   /** Días laborales considerados por semana para la proyección (burn rate). */
   WORKING_DAYS_PER_WEEK: 6,
-  /** Semanas promedio por mes, para proyectar el cierre mensual. */
-  WEEKS_PER_MONTH: 4.345,
   /** Máximo de horas extra por solicitud de autorización. */
   MAX_AUTHORIZATION_HOURS: 5,
 } as const;
@@ -113,26 +111,36 @@ export function projectWeek(
 }
 
 /**
- * Proyección de cierre de MES (burn rate mensual). A partir de las horas extra
- * acumuladas y el número de semanas transcurridas, estima el total del mes.
+ * Proyección de cierre de MES. Toma las horas extra ya acumuladas y el ritmo
+ * observado en las semanas con datos, y lo aplica SOLO a las semanas que le
+ * faltan al mes:
+ *
+ *   proyección = acumulado + (acumulado / semanas cubiertas) × semanas restantes
+ *
+ * Así nunca queda por debajo de lo ya trabajado (el acumulado es el piso) y
+ * respeta que un mes tenga 4 o 5 semanas. En un mes cerrado no hay semanas
+ * restantes: la proyección es el acumulado.
+ *
+ * @param accumulated     Horas extra acumuladas en el mes.
+ * @param coveredWeeks    Semanas del mes que ya tienen datos cargados.
+ * @param weeksInMonth    Semanas que tiene el mes (4 o 5).
+ * @param closed          true si el mes ya terminó.
  */
 export function projectMonth(
-  monthlyOvertimeSoFar: number,
-  weeksElapsed: number
+  accumulated: number,
+  coveredWeeks: number,
+  weeksInMonth: number,
+  closed = false
 ): MonthProjection {
-  if (weeksElapsed <= 0) {
-    return {
-      weeksElapsed: 0,
-      projectedMonthlyOvertime: round2(Math.max(0, monthlyOvertimeSoFar)),
-      willExceedMonthly: monthlyOvertimeSoFar > RULES.MONTHLY_OVERTIME_LIMIT,
-    };
-  }
-  const avg = monthlyOvertimeSoFar / weeksElapsed;
-  const projected = round2(avg * RULES.WEEKS_PER_MONTH);
+  const acc = Math.max(0, accumulated);
+  const remaining = closed ? 0 : Math.max(0, weeksInMonth - coveredWeeks);
+  const projected =
+    coveredWeeks > 0 && remaining > 0 ? acc + (acc / coveredWeeks) * remaining : acc;
+  const value = round2(projected);
   return {
-    weeksElapsed,
-    projectedMonthlyOvertime: projected,
-    willExceedMonthly: projected > RULES.MONTHLY_OVERTIME_LIMIT,
+    weeksElapsed: coveredWeeks,
+    projectedMonthlyOvertime: value,
+    willExceedMonthly: value > RULES.MONTHLY_OVERTIME_LIMIT,
   };
 }
 

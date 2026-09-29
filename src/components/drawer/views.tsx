@@ -1,12 +1,24 @@
 "use client";
 
 import clsx from "clsx";
-import { StatusBadge } from "../StatusBadge";
+import { LevelIcon, PendingIcon, StatusBadge } from "../StatusBadge";
 import { BudgetBar } from "../BudgetBar";
 import { RULES } from "@/lib/overtime";
 import type { EmployeeStatus, EmployeeWeek } from "@/lib/aggregate";
 import type { SemaphoreLevel } from "@/lib/types";
 import type { DrawerView, GroupDim, Segment } from "./context";
+
+const TEXT: Record<SemaphoreLevel, string> = {
+  green: "text-status-green",
+  yellow: "text-status-yellow",
+  red: "text-status-red",
+};
+
+const LEVEL_LABEL: Record<SemaphoreLevel, string> = {
+  green: "Normal",
+  yellow: "Preventivo",
+  red: "Crítico",
+};
 
 const DOT: Record<SemaphoreLevel, string> = {
   green: "bg-status-green",
@@ -56,8 +68,8 @@ export const SEGMENT_TEXT: Record<Segment, { title: string; desc: string }> = {
     desc: "Turnos de más de 16 horas sin marcación de salida. Están congelados y no suman al acumulado hasta que Recursos Humanos los resuelva.",
   },
   weeklyHigh: {
-    title: "Semanas por encima de 12h",
-    desc: "Es informativo: pasar de 12 horas extra en una semana está permitido. El límite que cuenta es el mensual.",
+    title: "Semanas de más de 12h",
+    desc: "Personas con al menos una semana de más de 12 horas extra este mes. Es informativo: está permitido. El límite que cuenta es el mensual.",
   },
 };
 
@@ -110,10 +122,22 @@ export function PersonRow({
         onClick={onClick}
         className="group flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition hover:bg-brand-tint"
       >
-        <span className={clsx("h-2.5 w-2.5 shrink-0 rounded-full", DOT[s.level])} aria-hidden />
+        <LevelIcon level={s.level} className={TEXT[s.level]} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-slate-900">
-            {s.name ?? s.code}
+          <span className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-medium text-slate-900">
+              {s.name ?? s.code}
+            </span>
+            <span className="sr-only">({LEVEL_LABEL[s.level]})</span>
+            {s.hasError && (
+              <span
+                className="inline-flex shrink-0 items-center gap-0.5 text-[11px] font-medium text-violet-700"
+                title="Tiene registros congelados por revisar"
+              >
+                <PendingIcon className="h-2.5 w-2.5" />
+                por revisar
+              </span>
+            )}
           </span>
           {showArea && (
             <span className="block truncate text-xs text-slate-600">
@@ -191,7 +215,7 @@ export function EmployeeQuickView({
   return (
     <div className="space-y-5 motion-safe:animate-fade-in">
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge level={s.level} />
+        <StatusBadge level={s.level} pending={s.pendingReviewCount} />
         <span className="text-[13px] text-slate-600">
           ID {s.code}
           {s.roleTitle ? ` · ${s.roleTitle}` : ""}
@@ -218,19 +242,29 @@ export function EmployeeQuickView({
 
       <section className="rounded-xl border border-brand/30 bg-white p-4">
         <p className="mb-2 text-sm font-medium text-brand-dark">
-          Horas extra disponibles este mes
+          {s.monthlyOvertime > RULES.MONTHLY_OVERTIME_LIMIT
+            ? `Límite mensual superado (${RULES.MONTHLY_OVERTIME_LIMIT}h)`
+            : "Horas extra disponibles este mes"}
         </p>
         <BudgetBar
           used={s.monthlyOvertime}
           limit={RULES.MONTHLY_OVERTIME_LIMIT}
           warning={RULES.MONTHLY_OVERTIME_WARNING}
         />
+        {s.pendingReviewCount > 0 && (
+          <p className="mt-2 rounded-md bg-violet-50 px-2 py-1.5 text-xs text-violet-800">
+            Con {s.pendingReviewCount} registro{s.pendingReviewCount > 1 ? "s" : ""} por
+            revisar, el mes quedaría entre {s.monthlyOvertime.toFixed(1)}h y ≈
+            {s.potentialMonthlyOvertime.toFixed(1)}h según se resuelva
+            {s.pendingReviewCount > 1 ? "n" : ""}.
+          </p>
+        )}
       </section>
 
       <div className="grid grid-cols-2 gap-3">
         <Stat
-          label="Extra esta semana"
-          value={`${s.weeklyOvertime.toFixed(1)}h${s.weeklyHigh ? " · alta" : ""}`}
+          label={`Extra esta semana (ref. ${RULES.WEEKLY_OVERTIME_LIMIT}h)`}
+          value={`${s.weeklyOvertime.toFixed(1)}h`}
         />
         <Stat
           label="Proyección de cierre"
@@ -250,29 +284,44 @@ export function EmployeeQuickView({
             {weeks.map((w) => (
               <li key={w.week} className="flex items-center gap-3 text-sm">
                 <span className="w-14 shrink-0 text-slate-600">Sem {w.week}</span>
-                <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                {w.hasError ? (
+                  // Sin barra de magnitud: esas horas no están validadas.
                   <span
                     className={clsx(
-                      "block h-full origin-left rounded-full motion-safe:animate-grow-x",
-                      w.hasError ? "bg-amber-400" : "bg-brand"
+                      "flex min-h-6 flex-1 items-center rounded-md border border-dashed px-2 text-xs",
+                      w.reviewed
+                        ? "border-slate-300 text-slate-500"
+                        : "border-violet-300 bg-violet-50 text-violet-800"
                     )}
-                    style={{ width: `${w.hasError ? 100 : Math.max(3, (w.overtime / maxWeek) * 100)}%` }}
-                  />
-                </span>
-                <span className="w-20 shrink-0 text-right tabular-nums text-slate-800">
-                  {w.hasError ? (
-                    <span className="text-xs font-medium text-amber-700">congelado</span>
-                  ) : (
-                    `${w.overtime.toFixed(1)}h`
-                  )}
+                  >
+                    {w.reviewed
+                      ? "descartado · no suma"
+                      : `congelado${w.grossHours ? ` · ${w.grossHours.toFixed(0)}h brutas` : ""} sin validar`}
+                  </span>
+                ) : (
+                  <span className="relative h-2.5 flex-1 rounded-full bg-slate-100">
+                    <span
+                      className="block h-full origin-left rounded-full bg-brand-light motion-safe:animate-grow-x"
+                      style={{ width: `${Math.max(3, (w.overtime / maxWeek) * 100)}%` }}
+                    />
+                    <span
+                      className="absolute -top-0.5 h-3.5 w-px bg-slate-400"
+                      style={{ left: `${(RULES.WEEKLY_OVERTIME_LIMIT / maxWeek) * 100}%` }}
+                      title={`Referencia ${RULES.WEEKLY_OVERTIME_LIMIT}h`}
+                      aria-hidden
+                    />
+                  </span>
+                )}
+                <span className="w-16 shrink-0 text-right tabular-nums text-slate-800">
+                  {w.hasError ? "—" : `${w.overtime.toFixed(1)}h`}
                 </span>
               </li>
             ))}
           </ul>
         )}
         <p className="mt-2 text-xs text-slate-500">
-          Pasar de {RULES.WEEKLY_OVERTIME_LIMIT}h en una semana está permitido; el límite
-          que cuenta es el mensual.
+          La raya marca la referencia de {RULES.WEEKLY_OVERTIME_LIMIT}h: pasarla en una
+          semana está permitido; el límite que cuenta es el mensual.
         </p>
       </section>
 
@@ -365,7 +414,7 @@ export function SegmentQuickView({
     segment === "atRisk"
       ? `≈${m.projectedMonthlyOvertime.toFixed(0)}h`
       : segment === "weeklyHigh"
-        ? `${m.weeklyOvertime.toFixed(1)}h/sem`
+        ? `${m.highWeeksMonth} sem. >${RULES.WEEKLY_OVERTIME_LIMIT}h`
         : `${m.monthlyOvertime.toFixed(1)}h`;
 
   return (

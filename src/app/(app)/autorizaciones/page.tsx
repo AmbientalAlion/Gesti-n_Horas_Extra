@@ -6,14 +6,9 @@ import { AuthRequestForm, type AuthEmployee } from "@/components/AuthRequestForm
 import type { WeekDayOpt } from "@/components/WeekDayPicker";
 import { RULES } from "@/lib/overtime";
 import { PageHeader } from "@/components/PageHeader";
+import { MONTHS, formatShortDay, plantWeekDays } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
-
-const MONTHS = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-];
-const DOW = ["L", "M", "M", "J", "V", "S", "D"];
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   solicitada: { label: "Solicitada", cls: "text-status-yellow" },
@@ -21,35 +16,9 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   rechazada: { label: "Rechazada", cls: "text-status-red" },
 };
 
-function iso(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
-  ).padStart(2, "0")}`;
-}
-
-function currentWeekDays(): WeekDayOpt[] {
-  const now = new Date();
-  const dow = now.getDay() || 7;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - (dow - 1));
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return {
-      date: iso(d),
-      dow: DOW[i],
-      day: d.getDate(),
-      isToday: d.toDateString() === now.toDateString(),
-    };
-  });
-}
-
-function formatDay(dateStr?: string | null): string | null {
-  if (!dateStr) return null;
-  const [y, m, d] = dateStr.split("-").map(Number);
-  if (!y || !m || !d) return null;
-  return `${DOW[(new Date(y, m - 1, d).getDay() || 7) - 1]} ${d}/${m}`;
-}
+// Calendario de la semana en curso y rótulos de día: hora de Colombia.
+const currentWeekDays = (): WeekDayOpt[] => plantWeekDays();
+const formatDay = formatShortDay;
 
 export default async function AutorizacionesPage() {
   const profile = await getSessionProfile();

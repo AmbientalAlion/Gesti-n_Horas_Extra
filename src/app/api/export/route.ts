@@ -1,66 +1,79 @@
-import { buildPayrollCsv } from "@/lib/csv";
-import { getDashboardData } from "@/lib/data";
-import { demoExportRows } from "@/lib/demo";
-import type { Period } from "@/lib/aggregate";
+import { createHash } from "node:crypto";
+import { getPayrollData, getSessionProfile } from "@/lib/data";
+import { demoPayrollRows, isSupabaseConfigured } from "@/lib/demo";
 import type { Role } from "@/lib/types";
+import { buildPayrollCsv, payrollTotals } from "@/lib/payroll";
+import { currentPeriodInfo } from "@/lib/dates";
+import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const NO_STORE = { "Cache-Control": "private, no-store" };
+
+function text(status: number, message: string) {
+  return new Response(message, {
+    status,
+    headers: { "Content-Type": "text/plain; charset=utf-8", ...NO_STORE },
+  });
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const year = Number(searchParams.get("year"));
-  const month = Number(searchParams.get("month"));
-  const week = Number(searchParams.get("week"));
-  const demoOnly = searchParams.get("demo") === "1";
+  const cur = currentPeriodInfo();
+  const y = Number(searchParams.get("year"));
+  const m = Number(searchParams.get("month"));
+  const year = Number.isInteger(y) && y >= 2000 && y <= 2100 ? y : cur.year;
+  const month = Number.isInteger(m) && m >= 1 && m <= 12 ? m : cur.month;
 
-  let rows: Array<{
-    employeeId: string;
-    name?: string;
-    area?: string;
-    year: number;
-    month: number;
-    week: number;
-    overtimeHours: number;
-    status: string;
-  }>;
-  let usedPeriod: Period;
-
-  if (demoOnly) {
-    const roleParam = searchParams.get("rol") ?? "rrhh";
-    const role = (["rrhh", "director", "jefe"].includes(roleParam)
-      ? roleParam
-      : "rrhh") as Role;
-    const demo = demoExportRows(role);
-    rows = demo.rows;
-    usedPeriod = demo.period;
-  } else {
-    const period = year && month && week ? { year, month, week } : undefined;
-    const data = await getDashboardData(period);
-    usedPeriod = data.period;
-    // Novedades depuradas: excluimos empleados sin extras y registros con error
-    // (horas huérfanas congeladas para revisión manual).
-    rows = data.statuses
-      .filter((s) => !s.hasError && s.monthlyOvertime > 0)
-      .map((s) => ({
-        employeeId: s.code,
-        name: s.name,
-        area: s.area,
-        year: usedPeriod.year,
-        month: usedPeriod.month,
-        week: usedPeriod.week,
-        overtimeHours: s.monthlyOvertime,
-        status: s.level,
-      }));
+  // Demo pública: datos ficticios, sin sesión.
+  if (searchParams.get("demo") === "1") {
+    const r = searchParams.get("rol") ?? "rrhh";
+    const role = (["rrhh", "director", "jefe"].includes(r) ? r : "rrhh") as Role;
+    const demo = demoPayrollRows(role);
+    return new Response(buildPayrollCsv(demo.rows), {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="horas_extra_demo.csv"`,
+        ...NO_STORE,
+      },
+    });
   }
 
-  const csv = buildPayrollCsv(rows);
-  const filename = `horas_extra_${usedPeriod.year}_${String(usedPeriod.month).padStart(2, "0")}.csv`;
+  // Con Supabase configurado, solo RRHH descarga el archivo de nómina.
+  if (isSupabaseConfigured()) {
+    const profile = await getSessionProfile();
+    if (!profile) return text(401, "Inicie sesión para descargar el archivo de nómina.");
+    if (profile.role !== "rrhh") {
+      return text(403, "Solo Recursos Humanos puede descargar el archivo de nómina.");
+    }
+  }
 
+  const { rows, period, demo } = await getPayrollData(year, month);
+  const csv = buildPayrollCsv(rows);
+
+  if (!demo) {
+    // Bitácora (quién, cuándo, qué mes y huella del archivo). Si la tabla aún
+    // no existe, la descarga no se bloquea.
+    const t = payrollTotals(rows);
+    const supabase = createClient();
+    await supabase.from("payroll_exports").insert({
+      year: period.year,
+      month: period.month,
+      month_closed: period.status === "cerrado",
+      row_count: rows.length,
+      total_hours: t.hours,
+      pending_weeks: t.pendingWeeks,
+      sha256: createHash("sha256").update(csv).digest("hex"),
+    });
+  }
+
+  const filename = `horas_extra_${period.year}_${String(period.month).padStart(2, "0")}.csv`;
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
+      ...NO_STORE,
     },
   });
 }

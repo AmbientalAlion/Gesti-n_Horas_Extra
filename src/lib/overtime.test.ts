@@ -81,17 +81,38 @@ describe("projectWeek (burn rate)", () => {
 });
 
 describe("projectMonth (proyección de cierre)", () => {
-  it("proyecta el mes según el promedio semanal", () => {
-    // 30h extra en 2 semanas => 15/sem => ~65h proyectadas (4.345 sem)
-    const p = projectMonth(30, 2);
-    expect(p.projectedMonthlyOvertime).toBeGreaterThan(RULES.MONTHLY_OVERTIME_LIMIT);
+  it("aplica el ritmo solo a las semanas que faltan", () => {
+    // 30h en 2 de 4 semanas => 15/sem => 30 + 15×2 = 60h
+    const p = projectMonth(30, 2, 4);
+    expect(p.projectedMonthlyOvertime).toBe(60);
     expect(p.willExceedMonthly).toBe(true);
   });
 
   it("no marca exceso si el ritmo es bajo", () => {
-    // 12h en 2 semanas => 6/sem => ~26h => dentro del límite
-    const p = projectMonth(12, 2);
+    // 12h en 2 de 4 semanas => 6/sem => 24h
+    expect(projectMonth(12, 2, 4).willExceedMonthly).toBe(false);
+  });
+
+  it("nunca queda por debajo del acumulado en un mes de 5 semanas", () => {
+    // Antes: 50h / 5 sem × 4,345 = 43,45h «dentro del límite».
+    const p = projectMonth(50, 5, 5);
+    expect(p.projectedMonthlyOvertime).toBe(50);
+    expect(p.willExceedMonthly).toBe(true);
+  });
+
+  it("una sola semana de 12h al inicio no dispara el amarillo", () => {
+    // 12h en 1 de 4 semanas => 12 + 12×3 = 48h (no supera 48)
+    expect(projectMonth(12, 1, 4).willExceedMonthly).toBe(false);
+  });
+
+  it("en un mes cerrado no proyecta: la proyección es el acumulado", () => {
+    const p = projectMonth(30, 2, 4, true);
+    expect(p.projectedMonthlyOvertime).toBe(30);
     expect(p.willExceedMonthly).toBe(false);
+  });
+
+  it("sin datos del mes, la proyección es 0", () => {
+    expect(projectMonth(0, 0, 4).projectedMonthlyOvertime).toBe(0);
   });
 });
 

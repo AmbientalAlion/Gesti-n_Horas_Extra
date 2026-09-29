@@ -14,6 +14,7 @@ import { StatusBadge } from "./StatusBadge";
 import { DashboardFilters } from "./DashboardFilters";
 import { FigureCluster } from "./brand/Figures";
 import { RULES } from "@/lib/overtime";
+import { MONTHS, formatWeekRange, weeksOfMonth } from "@/lib/dates";
 import type { Role } from "@/lib/types";
 import type {
   DashboardCharts,
@@ -47,10 +48,28 @@ const ROLE_FOCUS: Record<Role | "demo", { tag: string; focus: string }> = {
   },
 };
 
-const MONTHS = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-];
+/** Texto del periodo: mes, estado y semana de referencia con su rango. */
+function periodLabel(period: Period): { main: string; note?: string } {
+  const weeks = weeksOfMonth(period.year, period.month);
+  const ref = weeks.find((w) => w.week === period.week) ?? weeks[weeks.length - 1];
+  const mes = `${MONTHS[period.month - 1]} ${period.year}`;
+  const mesCap = mes.charAt(0).toUpperCase() + mes.slice(1);
+  const rango = formatWeekRange(ref.start, ref.end);
+  if (period.status === "cerrado") {
+    return { main: `${mesCap} · mes cerrado (${weeks.length} semanas)` };
+  }
+  if (period.status === "futuro") {
+    return { main: `${mesCap} · el mes aún no empieza` };
+  }
+  const cubiertas = period.coveredWeeks ?? 0;
+  const main = `${mesCap} · semana ${ref.week} (${rango}) · ${cubiertas} de ${weeks.length} semanas con datos`;
+  // La semana se imputa al mes de su jueves: avisar cuando cruza de mes.
+  const note =
+    ref.start.m !== period.month || ref.end.m !== period.month
+      ? `La semana ${ref.week} cuenta para ${MONTHS[period.month - 1]} porque su jueves cae en ese mes.`
+      : undefined;
+  return { main, note };
+}
 
 export function DashboardView({
   statuses,
@@ -125,9 +144,11 @@ export function DashboardView({
               </div>
               <h1 className="text-2xl font-bold text-brand-dark">Panel de control</h1>
               <p className="text-sm text-slate-600">
-                {scopeLabel} · Semana {period.week} · {MONTHS[period.month - 1]}{" "}
-                {period.year}
+                {scopeLabel} · {periodLabel(period).main}
               </p>
+              {periodLabel(period).note && (
+                <p className="text-xs text-slate-500">{periodLabel(period).note}</p>
+              )}
               <p className="mt-1 max-w-[65ch] text-[15px] leading-relaxed text-slate-600">
                 {ROLE_FOCUS[role].focus}
               </p>
@@ -165,7 +186,7 @@ export function DashboardView({
           <KpiCard
             label="Excedieron el mes"
             value={summary.red}
-            tone="red"
+            tone={summary.red > 0 ? "red" : "default"}
             hint="Más de 48h extra acumuladas"
             segment="red"
             delay={50}
@@ -186,17 +207,21 @@ export function DashboardView({
             delay={150}
           />
           <KpiCard
-            label="Semanas por encima de 12h"
+            label="Semanas de más de 12h"
             value={summary.weeklyHigh}
-            hint="Informativo: el límite que cuenta es el mensual"
+            hint={
+              summary.weeklyHigh > 0
+                ? `De ${summary.weeklyHighPeople} persona${summary.weeklyHighPeople === 1 ? "" : "s"} este mes · informativo`
+                : "Informativo: el límite que cuenta es el mensual"
+            }
             segment="weeklyHigh"
             delay={200}
           />
           <KpiCard
             label="Registros por revisar"
             value={summary.withErrors}
-            tone={summary.withErrors > 0 ? "yellow" : "default"}
-            hint="Horas huérfanas: turnos de más de 16h sin salida"
+            tone={summary.withErrors > 0 ? "violet" : "default"}
+            hint="Personas con turnos de más de 16h sin salida, congelados"
             segment="errors"
             delay={250}
           />

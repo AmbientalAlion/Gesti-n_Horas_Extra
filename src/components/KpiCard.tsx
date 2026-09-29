@@ -7,6 +7,7 @@ const TONES = {
   default: "text-slate-900",
   red: "text-status-red",
   yellow: "text-status-yellow",
+  violet: "text-violet-700",
 } as const;
 
 /**

@@ -19,6 +19,8 @@ import {
 } from "./aggregate";
 import { DEMO_PERIOD, demoEmployees, demoRecords, isSupabaseConfigured } from "./demo";
 import { createClient } from "./supabase/server";
+import { coveredWeeks, currentPeriodInfo, periodForMonth } from "./dates";
+import { buildPayrollRows, type PayrollRow, type Recargos } from "./payroll";
 import type { Role, WeeklyRecord } from "./types";
 
 export type { Filters, FilterOptions } from "./aggregate";
@@ -69,6 +71,10 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
  * Obtiene los datos del dashboard para el periodo indicado (por defecto el actual).
  * El alcance se aplica por RLS en Supabase (un jefe solo ve su equipo).
  */
+// Registros del último getDashboardData (misma petición): los usa la
+// exportación a nómina sin volver a consultarlos.
+let lastRecords: WeeklyRecord[] = [];
+
 export async function getDashboardData(
   period?: Period,
   filters: Filters = {}
@@ -80,12 +86,17 @@ export async function getDashboardData(
     const emps = applyFilters(demoEmployees, filters);
     const ids = new Set(emps.map((e) => e.id));
     const recs = demoRecords.filter((r) => ids.has(r.employeeId));
-    const statuses = computeEmployeeStatuses(emps, recs, DEMO_PERIOD);
+    const dp: Period = {
+      ...DEMO_PERIOD,
+      coveredWeeks: coveredWeeks(demoRecords, DEMO_PERIOD.year, DEMO_PERIOD.month),
+    };
+    const statuses = computeEmployeeStatuses(emps, recs, dp);
+    lastRecords = recs;
     return {
       statuses,
       summary: summarize(statuses),
-      charts: computeDashboardCharts(statuses, recs, DEMO_PERIOD),
-      period: DEMO_PERIOD,
+      charts: computeDashboardCharts(statuses, recs, dp),
+      period: dp,
       demo: true,
       role: "demo",
       filters,
@@ -119,7 +130,7 @@ export async function getDashboardData(
   const { data: recordsRaw } = await supabase
     .from("weekly_records")
     .select(
-      "employee_id, year, week, month, total_hours, overtime_hours, is_partial, has_error, error_reason, max_shift_hours"
+      "employee_id, year, week, month, total_hours, overtime_hours, is_partial, has_error, error_reason, max_shift_hours, review_status, source"
     )
     .eq("year", p.year)
     .eq("month", p.month);
@@ -129,12 +140,14 @@ export async function getDashboardData(
     year: r.year,
     week: r.week,
     month: r.month,
-    totalHours: Number(r.total_hours),
+    totalHours: r.total_hours != null ? Number(r.total_hours) : 0,
     overtimeHours: Number(r.overtime_hours),
     isPartial: r.is_partial,
     hasError: r.has_error,
     errorReason: r.error_reason ?? undefined,
     maxShiftHours: r.max_shift_hours != null ? Number(r.max_shift_hours) : undefined,
+    reviewStatus: r.review_status ?? undefined,
+    source: r.source ?? (r.total_hours == null ? "novedades" : "biometrico"),
   }));
 
   const filterOptions = buildFilterOptions(employees, filters);
@@ -142,12 +155,16 @@ export async function getDashboardData(
   const ids = new Set(filteredEmployees.map((e) => e.id));
   const filteredRecords = records.filter((r) => ids.has(r.employeeId));
 
-  const statuses = computeEmployeeStatuses(filteredEmployees, filteredRecords, p);
+  // Cobertura del mes sobre TODOS los registros visibles (no solo los
+  // filtrados): así el ritmo de la proyección no depende de los filtros.
+  const pc: Period = { ...p, coveredWeeks: p.coveredWeeks ?? coveredWeeks(records, p.year, p.month) };
+  lastRecords = filteredRecords;
+  const statuses = computeEmployeeStatuses(filteredEmployees, filteredRecords, pc);
   return {
     statuses,
     summary: summarize(statuses),
-    charts: computeDashboardCharts(statuses, filteredRecords, p),
-    period: p,
+    charts: computeDashboardCharts(statuses, filteredRecords, pc),
+    period: pc,
     demo: false,
     role: profile?.role ?? "jefe",
     filters,
@@ -182,7 +199,7 @@ export async function getEmployeeDetail(
   const { data: recordsRaw } = await supabase
     .from("weekly_records")
     .select(
-      "employee_id, year, week, month, total_hours, overtime_hours, is_partial, has_error, error_reason, max_shift_hours, ot_extra_diurna, ot_extra_nocturna, ot_dom_diurna, ot_dom_nocturna"
+      "employee_id, year, week, month, total_hours, overtime_hours, is_partial, has_error, error_reason, max_shift_hours, review_status, source, ot_extra_diurna, ot_extra_nocturna, ot_dom_diurna, ot_dom_nocturna"
     )
     .eq("employee_id", id)
     .eq("year", period.year);
@@ -193,12 +210,14 @@ export async function getEmployeeDetail(
     year: r.year,
     week: r.week,
     month: r.month,
-    totalHours: Number(r.total_hours),
+    totalHours: r.total_hours != null ? Number(r.total_hours) : 0,
     overtimeHours: Number(r.overtime_hours),
     isPartial: r.is_partial,
     hasError: r.has_error,
     errorReason: r.error_reason ?? undefined,
     maxShiftHours: r.max_shift_hours != null ? Number(r.max_shift_hours) : undefined,
+    reviewStatus: r.review_status ?? undefined,
+    source: r.source ?? (r.total_hours == null ? "novedades" : "biometrico"),
   }));
 
   const detail = buildEmployeeDetail(status, history, dash.statuses, dash.period);
@@ -264,13 +283,60 @@ export async function getPendingAuthorizations(): Promise<PendingAuth[]> {
   }));
 }
 
-/** Periodo actual (año, mes, semana ISO) según la fecha del servidor. */
-export function currentPeriod(): Period {
-  const now = new Date();
-  const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return { year: now.getFullYear(), month: now.getMonth() + 1, week };
+/**
+ * Periodo actual: semana ISO en curso en hora de Colombia y el mes al que se
+ * imputa (mes de su jueves). Ver src/lib/dates.ts.
+ */
+export function currentPeriod(now: Date = new Date()): Period {
+  const p = currentPeriodInfo(now);
+  return { year: p.year, month: p.month, week: p.week, status: p.status, weeksInMonth: p.weeksInMonth };
+}
+
+export interface PayrollData {
+  rows: PayrollRow[];
+  period: Period;
+  demo: boolean;
+}
+
+/**
+ * Filas de nómina de un mes: horas válidas por persona (se excluyen semanas
+ * congeladas, no personas) y desglose de recargos cuando el origen lo trae.
+ */
+export async function getPayrollData(year: number, month: number): Promise<PayrollData> {
+  const info = periodForMonth(year, month);
+  const base: Period = {
+    year: info.year,
+    month: info.month,
+    week: info.week,
+    status: info.status,
+    weeksInMonth: info.weeksInMonth,
+  };
+  const dash = await getDashboardData(isSupabaseConfigured() ? base : undefined);
+  const records = lastRecords;
+
+  const recargos = new Map<string, Recargos>();
+  if (!dash.demo) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("weekly_records")
+      .select("employee_id, ot_extra_diurna, ot_extra_nocturna, ot_dom_diurna, ot_dom_nocturna")
+      .eq("year", dash.period.year)
+      .eq("month", dash.period.month)
+      .eq("has_error", false);
+    if (error) throw new Error(`No se pudo leer el desglose de recargos: ${error.message}`);
+    for (const r of data ?? []) {
+      const cur = recargos.get(r.employee_id) ?? { diurna: 0, nocturna: 0, domDiurna: 0, domNocturna: 0 };
+      cur.diurna += Number(r.ot_extra_diurna ?? 0);
+      cur.nocturna += Number(r.ot_extra_nocturna ?? 0);
+      cur.domDiurna += Number(r.ot_dom_diurna ?? 0);
+      cur.domNocturna += Number(r.ot_dom_nocturna ?? 0);
+      recargos.set(r.employee_id, cur);
+    }
+  }
+
+  return {
+    rows: buildPayrollRows(dash.statuses, records, dash.period, recargos),
+    period: dash.period,
+    demo: dash.demo,
+  };
 }

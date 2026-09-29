@@ -1,7 +1,8 @@
 import { DashboardView } from "@/components/DashboardView";
 import { MonthSelector } from "@/components/MonthSelector";
 import { PrintButton } from "@/components/PrintButton";
-import { currentPeriod, getDashboardData } from "@/lib/data";
+import { getDashboardData } from "@/lib/data";
+import { currentPeriodInfo, periodForMonth } from "@/lib/dates";
 import type { Filters } from "@/lib/aggregate";
 
 export const dynamic = "force-dynamic";
@@ -19,10 +20,21 @@ export default async function DashboardPage({
     jefe?: string;
   };
 }) {
-  const cur = currentPeriod();
-  const month = Number(searchParams.mes) || cur.month;
-  const year = Number(searchParams.anio) || cur.year;
-  const period = { year, month, week: cur.week };
+  // Mes elegido (o el de la semana en curso). La semana de referencia es la
+  // actual si el mes está abierto y la última del mes si ya cerró.
+  const cur = currentPeriodInfo();
+  const mesSel = Number(searchParams.mes);
+  const anioSel = Number(searchParams.anio);
+  const month = mesSel >= 1 && mesSel <= 12 ? mesSel : cur.month;
+  const year = anioSel >= 2000 && anioSel <= 2100 ? anioSel : cur.year;
+  const info = periodForMonth(year, month);
+  const period = {
+    year: info.year,
+    month: info.month,
+    week: info.week,
+    status: info.status,
+    weeksInMonth: info.weeksInMonth,
+  };
 
   const filters: Filters = {
     plant: searchParams.planta || undefined,
@@ -38,7 +50,7 @@ export default async function DashboardPage({
     Object.entries(searchParams).filter(([, v]) => v) as [string, string][]
   ).toString();
 
-  const { statuses, summary, charts, demo, role, filterOptions } =
+  const { statuses, summary, charts, demo, role, filterOptions, period: dataPeriod } =
     await getDashboardData(period, filters);
 
   const scopeLabel = role === "jefe" ? "Mi equipo" : "Planta completa";
@@ -55,7 +67,7 @@ export default async function DashboardPage({
         statuses={statuses}
         summary={summary}
         charts={charts}
-        period={period}
+        period={dataPeriod}
         scopeLabel={scopeLabel}
         hrefBase="/empleado"
         role={role === "demo" ? "demo" : role}

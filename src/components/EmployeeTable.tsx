@@ -80,12 +80,12 @@ export function EmployeeTable({
                   {r.area ? ` · ${r.area}` : ""}
                 </span>
               </div>
-              <StatusBadge level={r.level} />
+              <StatusBadge level={r.level} pending={r.pendingReviewCount} />
             </div>
 
             {r.hasError && (
-              <p className="mt-1.5 text-[13px] font-medium text-amber-700">
-                Registro por revisar (horas huérfanas)
+              <p className="mt-1.5 text-[13px] font-medium text-violet-700">
+                {r.pendingReviewCount > 1 ? `${r.pendingReviewCount} registros por revisar` : "Registro por revisar"} (horas huérfanas)
               </p>
             )}
 
@@ -156,8 +156,8 @@ export function EmployeeTable({
                   {r.roleTitle ? ` · ${r.roleTitle}` : ""}
                 </div>
                 {r.hasError && (
-                  <div className="mt-1 text-[13px] font-medium text-amber-700">
-                    Registro por revisar (horas huérfanas)
+                  <div className="mt-1 text-[13px] font-medium text-violet-700">
+                    {r.pendingReviewCount > 1 ? `${r.pendingReviewCount} registros por revisar` : "Registro por revisar"} (horas huérfanas)
                   </div>
                 )}
               </td>
@@ -201,7 +201,7 @@ export function EmployeeTable({
                 )}
               </td>
               <td className="px-4 py-3.5">
-                <StatusBadge level={r.level} />
+                <StatusBadge level={r.level} pending={r.pendingReviewCount} />
               </td>
             </tr>
           ))}

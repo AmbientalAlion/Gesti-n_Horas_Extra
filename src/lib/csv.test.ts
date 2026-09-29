@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPayrollCsv, isoWeek, parseBiometricCsv } from "./csv";
+import { isoWeek, parseBiometricCsv } from "./csv";
 
 describe("parseBiometricCsv", () => {
   it("parsea encabezados con tildes y variaciones", () => {
@@ -55,23 +55,3 @@ describe("isoWeek", () => {
   });
 });
 
-describe("buildPayrollCsv", () => {
-  it("genera CSV con encabezado y filas escapadas", () => {
-    const out = buildPayrollCsv([
-      {
-        employeeId: "E1",
-        name: "Juan, Pérez",
-        area: "Planta",
-        year: 2026,
-        month: 6,
-        week: 25,
-        overtimeHours: 8,
-        status: "red",
-      },
-    ]);
-    const lines = out.split("\n");
-    expect(lines[0]).toContain("ID_Empleado");
-    expect(lines[1]).toContain('"Juan, Pérez"');
-    expect(lines[1]).toContain("8");
-  });
-});

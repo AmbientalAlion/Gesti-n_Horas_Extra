@@ -1,6 +1,7 @@
 // Datos de demostración usados cuando Supabase no está configurado.
 // Permiten ejecutar y evaluar la aplicación de inmediato.
 
+import { buildPayrollRows } from "./payroll";
 import {
   applyFilters,
   buildEmployeeDetail,
@@ -18,6 +19,7 @@ import {
   type PlantSummary,
 } from "./aggregate";
 import type { Role, WeeklyRecord } from "./types";
+import { coveredWeeks } from "./dates";
 
 export function isSupabaseConfigured(): boolean {
   return Boolean(
@@ -26,7 +28,14 @@ export function isSupabaseConfigured(): boolean {
   );
 }
 
-export const DEMO_PERIOD = { year: 2026, month: 6, week: 25 };
+// Junio de 2026: semanas 23–26 (jueves en junio). La demo "vive" en la 25.
+export const DEMO_PERIOD: Period = {
+  year: 2026,
+  month: 6,
+  week: 25,
+  status: "abierto",
+  weeksInMonth: 4,
+};
 
 export const demoEmployees: EmployeeInput[] = [
   { id: "e1", code: "1001", name: "Ana Restrepo", area: "PRODUCCIÓN RIONEGRO", direccion: "Concretos", plant: "Rionegro", costCenter: "CA7CA00120-PRODUCCIÓN RIONEGRO", roleTitle: "Operaria", managerId: "m1", managerName: "Jefe Producción" },
@@ -100,12 +109,17 @@ export function demoDashboard(roleView: Role, filters: Filters = {}): DemoDashbo
   const empIds = new Set(employees.map((e) => e.id));
   const records = demoRecords.filter((r) => empIds.has(r.employeeId));
 
-  const statuses = computeEmployeeStatuses(employees, records, DEMO_PERIOD);
+  // Cobertura sobre todos los registros de la demo (no solo los filtrados).
+  const period: Period = {
+    ...DEMO_PERIOD,
+    coveredWeeks: coveredWeeks(demoRecords, DEMO_PERIOD.year, DEMO_PERIOD.month),
+  };
+  const statuses = computeEmployeeStatuses(employees, records, period);
   return {
     statuses,
     summary: summarize(statuses),
-    charts: computeDashboardCharts(statuses, records, DEMO_PERIOD),
-    period: DEMO_PERIOD,
+    charts: computeDashboardCharts(statuses, records, period),
+    period,
     roleView,
     filters,
     filterOptions,
@@ -113,23 +127,10 @@ export function demoDashboard(roleView: Role, filters: Filters = {}): DemoDashbo
 }
 
 /** Exporta las novedades depuradas del periodo demo para una vista de rol. */
-export function demoExportRows(roleView: Role) {
+/** Filas de nómina del demo (datos ficticios), respetando el alcance del rol. */
+export function demoPayrollRows(roleView: Role) {
   const { statuses, period } = demoDashboard(roleView);
-  return {
-    period,
-    rows: statuses
-      .filter((s) => !s.hasError && s.monthlyOvertime > 0)
-      .map((s) => ({
-        employeeId: s.code,
-        name: s.name,
-        area: s.area,
-        year: period.year,
-        month: period.month,
-        week: period.week,
-        overtimeHours: s.monthlyOvertime,
-        status: s.level,
-      })),
-  };
+  return { period, rows: buildPayrollRows(statuses, demoRecords, period) };
 }
 
 /** Detalle de un empleado en el demo, respetando el alcance del rol. */

@@ -4,22 +4,21 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile, currentPeriod } from "@/lib/data";
 import { RULES } from "@/lib/overtime";
+import { parseIsoDate, plantWeekDays, weekInfo } from "@/lib/dates";
 
 type Supa = ReturnType<typeof createClient>;
 
-/** Fechas ISO (yyyy-mm-dd) de los 7 días de la semana en curso. */
+/** Fechas ISO (yyyy-mm-dd) de los 7 días de la semana en curso (hora de Colombia). */
 function currentWeekIsoDays(): string[] {
-  const now = new Date();
-  const dow = now.getDay() || 7;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - (dow - 1));
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-      d.getDate()
-    ).padStart(2, "0")}`;
-  });
+  return plantWeekDays().map((d) => d.date);
+}
+
+/** Mes de imputación (mes del jueves de su semana) de un día `yyyy-mm-dd`. */
+function imputedMonth(day: string): { year: number; month: number } | null {
+  const c = parseIsoDate(day);
+  if (!c) return null;
+  const w = weekInfo(c);
+  return { year: w.year, month: w.month };
 }
 
 /**
@@ -54,12 +53,11 @@ async function monthlyUsage(
 
   const authorized = (auths ?? [])
     .filter((r: any) => (excludeId ? r.id !== excludeId : true))
-    .filter(
-      (r: any) =>
-        r.day_date &&
-        Number(String(r.day_date).slice(0, 4)) === year &&
-        Number(String(r.day_date).slice(5, 7)) === month
-    )
+    .filter((r: any) => {
+      // Mismo criterio que la carga: el día cuenta para el mes de su jueves.
+      const im = r.day_date ? imputedMonth(String(r.day_date)) : null;
+      return im !== null && im.year === year && im.month === month;
+    })
     .reduce((a: number, r: any) => a + Number(r.hours ?? 0), 0);
 
   return Math.round((real + authorized) * 100) / 100;
@@ -166,9 +164,9 @@ export async function decidirAutorizacion(formData: FormData) {
       .select("employee_id, hours, day_date")
       .eq("id", id)
       .single();
-    if (row?.day_date) {
-      const year = Number(String(row.day_date).slice(0, 4));
-      const month = Number(String(row.day_date).slice(5, 7));
+    const im = row?.day_date ? imputedMonth(String(row.day_date)) : null;
+    if (row && im) {
+      const { year, month } = im;
       const used = await monthlyUsage(supabase, row.employee_id, year, month, id);
       if (used + Number(row.hours) > RULES.MONTHLY_OVERTIME_LIMIT) {
         throw new Error(

@@ -43,7 +43,9 @@ export function segmentMembers(
     case "errors":
       return by((s) => s.hasError);
     case "weeklyHigh":
-      return by((s) => s.weeklyHigh).sort((a, b) => b.weeklyOvertime - a.weeklyOvertime);
+      return by((s) => s.highWeeksMonth > 0).sort(
+        (a, b) => b.highWeeksMonth - a.highWeeksMonth || b.monthlyOvertime - a.monthlyOvertime
+      );
     default:
       return [...statuses].sort((a, b) => b.monthlyOvertime - a.monthlyOvertime);
   }
