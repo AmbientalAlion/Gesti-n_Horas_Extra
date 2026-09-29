@@ -3,6 +3,7 @@ import { getSessionProfile } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/demo";
 import type { Role } from "@/lib/types";
 import { signOut } from "@/app/login/actions";
+import { redirect } from "next/navigation";
 
 export default async function AppLayout({
   children,
@@ -10,16 +11,20 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   let role: Role | "demo" = "demo";
+  let roleName: string | undefined;
   if (isSupabaseConfigured()) {
     const profile = await getSessionProfile();
+    // Primero se cambia la contraseña temporal.
+    if (profile?.mustChangePassword) redirect("/cuenta/contrasena");
     // Una cuenta sin rol asignado no ve datos (RF-26).
     if (!profile?.role) return <NoAccess />;
     role = profile.role;
+    roleName = profile.roleName ?? undefined;
   }
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
-      <Nav role={role} />
+      <Nav role={role} roleName={roleName} />
       <main id="contenido" className="flex-1 overflow-x-hidden">
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">{children}</div>
       </main>

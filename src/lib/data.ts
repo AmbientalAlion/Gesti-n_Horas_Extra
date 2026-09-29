@@ -1,3 +1,4 @@
+import { cache } from "react";
 // Capa de acceso a datos para los dashboards (Server Components).
 // Usa Supabase cuando está configurado; de lo contrario, datos demo.
 
@@ -40,12 +41,20 @@ export interface SessionProfile {
   id: string;
   email: string;
   fullName: string | null;
-  /** null = cuenta sin rol asignado: no ve datos. */
+  /** Nivel (qué puede hacer). null = cuenta sin rol asignado: no ve datos. */
   role: Role | null;
+  /** Nombre del rol de acceso asignado (p. ej. «Director Industrial»). */
+  roleName: string | null;
+  /** Debe cambiar la contraseña temporal antes de usar la aplicación. */
+  mustChangePassword: boolean;
 }
 
-/** Devuelve el perfil del usuario autenticado, o null si no hay sesión. */
-export async function getSessionProfile(): Promise<SessionProfile | null> {
+/**
+ * Devuelve el perfil del usuario autenticado, o null si no hay sesión.
+ * Con cache() se consulta una sola vez por petición aunque lo pidan varias
+ * páginas y componentes.
+ */
+export const getSessionProfile = cache(async (): Promise<SessionProfile | null> => {
   if (!isSupabaseConfigured()) return null;
   const supabase = createClient();
   const {
@@ -55,18 +64,21 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role")
+    .select("id, email, full_name, role, must_change_password, access_roles(name)")
     .eq("id", user.id)
     .single();
 
   if (!profile) return null;
+  const ar = (profile as any).access_roles;
   return {
     id: profile.id,
     email: profile.email,
     fullName: profile.full_name,
     role: (profile.role as Role | null) ?? null,
+    roleName: (Array.isArray(ar) ? ar[0]?.name : ar?.name) ?? null,
+    mustChangePassword: Boolean((profile as any).must_change_password),
   };
-}
+});
 
 /**
  * Páginas solo para Recursos Humanos (cargar, exportar, revisar, usuarios).

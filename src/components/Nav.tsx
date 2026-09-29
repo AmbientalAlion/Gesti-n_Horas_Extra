@@ -10,6 +10,8 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface NavProps {
   role: Role | "demo";
+  /** Nombre del rol de acceso (p. ej. «Director Industrial»). */
+  roleName?: string;
 }
 
 const ROLE_LABELS: Record<Role | "demo", string> = {
@@ -19,7 +21,7 @@ const ROLE_LABELS: Record<Role | "demo", string> = {
   demo: "Modo demostración",
 };
 
-export function Nav({ role }: NavProps) {
+export function Nav({ role, roleName }: NavProps) {
   const pathname = usePathname();
   const isRrhh = role === "rrhh" || role === "demo";
 
@@ -74,9 +76,17 @@ export function Nav({ role }: NavProps) {
           <div>
             <div className="hidden text-xs text-slate-500 lg:block">Rol</div>
             <div className="text-[13px] font-medium text-slate-700 lg:text-sm">
-              {ROLE_LABELS[role]}
+              {roleName ?? ROLE_LABELS[role]}
             </div>
           </div>
+          {role !== "demo" && (
+            <a
+              href="/cuenta/contrasena"
+              className="inline-flex min-h-11 items-center text-xs text-slate-600 hover:text-slate-800 lg:mt-2 lg:min-h-0"
+            >
+              Cambiar contraseña
+            </a>
+          )}
           {role !== "demo" && (
             <form action={signOut} className="lg:mt-3">
               <button
