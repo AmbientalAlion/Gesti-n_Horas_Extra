@@ -74,7 +74,8 @@ interface Row {
 function buildRow(s: EmployeeStatus, pts: SegmentPoint[], idx: number | null): Row {
   if (idx === null) {
     const hours = pts.reduce((a, p) => a + p.hours, 0);
-    const target = pts.filter((p) => !p.future).reduce((a, p) => a + p.segmentTarget, 0);
+    // Meta acumulada del mes a la fecha (12h por semana, tope de 48h).
+    const target = [...pts].reverse().find((p) => !p.future)?.target ?? 0;
     return {
       s,
       pts,

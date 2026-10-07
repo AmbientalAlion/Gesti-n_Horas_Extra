@@ -226,7 +226,7 @@ export interface SegmentPoint {
   cumulative: number;
   /** Meta acumulada al final del tramo. */
   target: number;
-  /** Meta propia del tramo (12h × días / 7, recortada al tope). */
+  /** Meta propia del tramo: 12h × días del tramo en el mes / 7 (sin el tope mensual). */
   segmentTarget: number;
   /** Tramo con registro congelado sin revisar. */
   pending: boolean;
@@ -273,7 +273,6 @@ export function segmentPoints(
 ): SegmentPoint[] {
   const weeks = weekTotals(empRecords);
   let cum = 0;
-  let prevTarget = 0;
   return p.segments.map((s) => {
     const recs = empRecords.filter(
       (r) => r.year === p.year && r.month === p.month && r.week === s.week
@@ -282,8 +281,10 @@ export function segmentPoints(
     const hours = round2(valid.reduce((a, r) => a + r.overtimeHours, 0));
     cum = round2(cum + hours);
     const target = monthlyTarget(s.end.d);
-    const segmentTarget = round2(target - prevTarget);
-    prevTarget = target;
+    // Meta propia de la semana: 12h ponderadas por los días que caen en el
+    // mes (una semana que cruza de mes reparte su meta entre ambos). No se
+    // recorta con el tope mensual de 48h: ese tope ya lo aplica `target`.
+    const segmentTarget = round2((RULES.WEEKLY_OVERTIME_LIMIT * s.days) / 7);
     const pendingRec = recs.find((r) => r.hasError && !r.reviewStatus);
     const discarded = recs.some((r) => r.hasError && r.reviewStatus === "descartado");
     const weekHours = weeks.get(weekId(s.isoYear, s.week)) ?? 0;

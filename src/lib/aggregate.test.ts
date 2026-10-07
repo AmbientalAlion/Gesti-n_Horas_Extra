@@ -4,6 +4,8 @@ import {
   buildEmployeeDetail,
   buildFilterOptions,
   computeEmployeeStatuses,
+  resolvePeriod,
+  segmentPoints,
   summarize,
   type EmployeeInput,
 } from "./aggregate";
@@ -134,5 +136,23 @@ describe("computeEmployeeStatuses (v2)", () => {
     expect(d.segments[0]).toMatchObject({ hours: 6, cumulative: 6, future: false, weekShared: true });
     expect(d.segments[1].future).toBe(true);
     expect(d.segments.map((x) => Math.round(x.target * 10) / 10)).toEqual([10.3, 22.3, 34.3, 46.3, 48]);
+  });
+});
+
+describe("segmentPoints: meta de cada semana", () => {
+  it("pondera la meta por los días de la semana que caen en el mes, sin el tope de 48h", () => {
+    // Junio 2026: 1–7, 8–14, 15–21, 22–28 y 29–30 (lunes y martes).
+    const p = resolvePeriod({ year: 2026, month: 6, week: 23, status: "cerrado", cutoffDay: 30 }, []);
+    const pts = segmentPoints(p, []);
+    expect(pts.map((x) => x.segmentTarget)).toEqual([12, 12, 12, 12, 3.43]);
+    // El acumulado del mes sí respeta el tope.
+    expect(pts[pts.length - 1].target).toBe(48);
+  });
+
+  it("una semana que empieza en el mes anterior solo lleva su parte", () => {
+    // Octubre 2026 empieza en jueves: el primer tramo es 1–4 oct (4 días).
+    const p = resolvePeriod({ year: 2026, month: 10, week: 40, status: "abierto", cutoffDay: 4 }, []);
+    const [first] = segmentPoints(p, []);
+    expect(first).toMatchObject({ days: 4, partial: true, segmentTarget: 6.86 });
   });
 });
