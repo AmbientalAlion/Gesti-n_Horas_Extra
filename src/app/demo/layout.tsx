@@ -8,18 +8,36 @@ export default function DemoLayout({
 }) {
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
-      <Suspense fallback={<div className="w-full border-b border-slate-200 bg-white lg:w-60 lg:border-b-0 lg:border-r" />}>
+      {/* DemoNav lee ?rol= (useSearchParams). El respaldo reserva el mismo
+          espacio para que nada salte al hidratar. */}
+      <Suspense
+        fallback={
+          <>
+            <div aria-hidden className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-line bg-surface lg:block" />
+            <div aria-hidden className="h-14 border-b border-line bg-surface lg:hidden" />
+          </>
+        }
+      >
         <DemoNav />
       </Suspense>
-      <main className="flex-1 overflow-x-hidden">
-        <div className="bg-brand px-4 py-2 text-center text-xs font-medium text-white print:hidden">
-          MODO DEMOSTRACIÓN
-          <span className="hidden sm:inline">
-            {" "}
-            · datos de ejemplo · use el selector «Ver como» para cambiar de rol
+      <main
+        id="contenido"
+        tabIndex={-1}
+        className="min-w-0 flex-1 overflow-x-clip pb-[calc(4rem+env(safe-area-inset-bottom))] focus:outline-none lg:pb-0"
+      >
+        {/* En el teléfono el aviso va como chip «Demo» en la barra superior. */}
+        <p
+          role="note"
+          className="hidden h-8 items-center justify-center gap-2 bg-brand-900 px-4 text-caption text-white print:hidden lg:flex"
+        >
+          <span className="rounded-chip bg-white/15 px-1.5 font-bold uppercase tracking-[0.02em]">
+            Modo demostración
           </span>
+          <span>Datos de ejemplo; los cambios no se guardan. Use «Ver como» para cambiar de rol.</span>
+        </p>
+        <div data-vt="page" className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+          {children}
         </div>
-        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">{children}</div>
       </main>
     </div>
   );

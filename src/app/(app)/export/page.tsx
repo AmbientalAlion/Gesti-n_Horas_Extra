@@ -45,7 +45,7 @@ export default async function ExportPage({
       />
 
       {!closed && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="rounded-lg border border-risk-border bg-risk-soft px-4 py-3 text-sm text-risk">
           {monthLabel(year, month)} todavía no ha cerrado: el archivo puede cambiar con las
           próximas cargas.
         </div>
@@ -68,7 +68,7 @@ export default async function ExportPage({
 
       <div className="card space-y-4">
         {rows.length === 0 ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-ink-2">
             No hay horas extra en {monthLabel(year, month)}. Cargue el archivo del biométrico y
             vuelva a intentarlo.
           </p>
@@ -83,7 +83,7 @@ export default async function ExportPage({
             )}
           </div>
         )}
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted">
           CSV para Excel en español: separador «;», coma decimal y tildes. Cada descarga queda
           registrada con su huella.
         </p>
@@ -91,11 +91,11 @@ export default async function ExportPage({
 
       {rows.length > 0 && (
         <section className="card overflow-x-auto p-0">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <caption className="px-4 py-3 text-left text-sm font-semibold text-brand-dark">
+          <table className="min-w-full divide-y divide-line text-sm">
+            <caption className="px-4 py-3 text-left text-sm font-semibold text-heading">
               Vista previa ({rows.length} filas)
             </caption>
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-600">
+            <thead className="bg-surface-2 text-left text-xs uppercase text-ink-2">
               <tr>
                 <th scope="col" className="px-4 py-2 font-medium">ID</th>
                 <th scope="col" className="px-4 py-2 font-medium">Nombre</th>
@@ -105,7 +105,7 @@ export default async function ExportPage({
                 <th scope="col" className="px-4 py-2 font-medium">Estado</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-line">
               {rows.slice(0, 200).map((r) => (
                 <tr key={r.code}>
                   <td className="px-4 py-2">{r.code}</td>
@@ -119,7 +119,7 @@ export default async function ExportPage({
             </tbody>
           </table>
           {rows.length > 200 && (
-            <p className="px-4 py-2 text-xs text-slate-500">
+            <p className="px-4 py-2 text-xs text-muted">
               Se muestran 200 de {rows.length}; el archivo trae todas.
             </p>
           )}

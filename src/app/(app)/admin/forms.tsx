@@ -53,7 +53,7 @@ function Feedback({ state }: { state: ActionState }) {
   return (
     <p
       role={state.error ? "alert" : "status"}
-      className={clsx("text-sm", state.error ? "text-status-red" : "text-green-700")}
+      className={clsx("text-sm", state.error ? "text-over" : "text-ok")}
     >
       {state.error ?? state.message}
     </p>
@@ -66,14 +66,14 @@ function TempPassword({ state }: { state: ActionState }) {
   if (!state.tempPassword) return null;
   const text = `Correo: ${state.email}\nContraseña temporal: ${state.tempPassword}\nEntrar en: ${typeof window !== "undefined" ? window.location.origin : ""}/login`;
   return (
-    <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-900">
+    <div className="rounded-lg border border-ok-border bg-ok-soft p-3 text-sm text-ok">
       <p className="font-medium">Entregue estos datos a la persona (solo se muestran ahora):</p>
       <p className="mt-1">
         Correo: <strong>{state.email}</strong>
       </p>
       <p>
         Contraseña temporal:{" "}
-        <code className="rounded bg-white px-1.5 py-0.5 font-mono text-base tracking-wide">{state.tempPassword}</code>
+        <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-base tracking-wide">{state.tempPassword}</code>
       </p>
       <p className="mt-1 text-xs">Al entrar por primera vez deberá crear su propia contraseña.</p>
       <button
@@ -95,15 +95,15 @@ export function CreateUserForm({ roles, enabled }: { roles: RoleOption[]; enable
     <form action={action} className="space-y-3">
       <div className="grid gap-3 md:grid-cols-3">
         <label className="text-sm">
-          <span className="mb-1 block text-slate-700">Correo</span>
+          <span className="mb-1 block text-ink-2">Correo</span>
           <input name="email" type="email" required autoComplete="off" placeholder="nombre@alion.com.co" className="field" disabled={!enabled} />
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-slate-700">Nombre completo</span>
+          <span className="mb-1 block text-ink-2">Nombre completo</span>
           <input name="fullName" required autoComplete="off" className="field" disabled={!enabled} />
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-slate-700">Rol</span>
+          <span className="mb-1 block text-ink-2">Rol</span>
           <select name="roleId" required defaultValue="" className="field" disabled={!enabled}>
             <option value="" disabled>
               Elija un rol…
@@ -217,7 +217,7 @@ export function RoleForm({
       {role && <input type="hidden" name="id" value={role.id} />}
       <div className="grid gap-3 md:grid-cols-2">
         <label className="text-sm">
-          <span className="mb-1 block text-slate-700">Nombre del rol</span>
+          <span className="mb-1 block text-ink-2">Nombre del rol</span>
           <input
             name="name"
             required
@@ -227,7 +227,7 @@ export function RoleForm({
           />
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-slate-700">Qué puede hacer</span>
+          <span className="mb-1 block text-ink-2">Qué puede hacer</span>
           <select
             name="level"
             value={level}
@@ -243,13 +243,13 @@ export function RoleForm({
         </label>
       </div>
       <label className="block text-sm">
-        <span className="mb-1 block text-slate-700">Descripción (opcional)</span>
+        <span className="mb-1 block text-ink-2">Descripción (opcional)</span>
         <input name="description" defaultValue={role?.description ?? ""} className="field" />
       </label>
 
       {level === "director" && (
-        <fieldset className="rounded-lg border border-slate-200 p-3">
-          <legend className="px-1 text-sm font-medium text-brand-dark">Qué puede ver</legend>
+        <fieldset className="rounded-lg border border-line p-3">
+          <legend className="px-1 text-sm font-medium text-heading">Qué puede ver</legend>
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -263,13 +263,13 @@ export function RoleForm({
             <div className="mt-3 grid gap-4 md:grid-cols-3">
               {(Object.keys(DIM_LABEL) as (keyof ScopeCatalog)[]).map((dim) => (
                 <div key={dim}>
-                  <p className="mb-1 text-[13px] font-semibold text-slate-700">{DIM_LABEL[dim]}</p>
+                  <p className="mb-1 text-[13px] font-semibold text-ink-2">{DIM_LABEL[dim]}</p>
                   {catalog[dim].length === 0 ? (
-                    <p className="text-xs text-slate-500">Sin datos cargados.</p>
+                    <p className="text-xs text-muted">Sin datos cargados.</p>
                   ) : (
                     <div className="max-h-48 space-y-1 overflow-y-auto pr-1">
                       {catalog[dim].map((v) => (
-                        <label key={v} className="flex items-start gap-2 text-[13px] text-slate-700">
+                        <label key={v} className="flex items-start gap-2 text-[13px] text-ink-2">
                           <input type="checkbox" name={dim} value={v} defaultChecked={has(dim, v)} className="mt-0.5" />
                           <span>{v}</span>
                         </label>
@@ -280,20 +280,20 @@ export function RoleForm({
               ))}
             </div>
           )}
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-muted">
             Verá a las personas que estén en cualquiera de las direcciones, plantas o áreas
             marcadas, y a quienes lo tengan como jefe inmediato.
           </p>
         </fieldset>
       )}
       {level === "jefe" && (
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-ink-2">
           Verá solo a las personas que lo tengan como jefe inmediato (sección «Empleados y su
           jefe inmediato»).
         </p>
       )}
       {level === "rrhh" && (
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-ink-2">
           Ve toda la organización y puede cargar archivos, revisar registros, exportar a nómina
           y administrar usuarios y roles.
         </p>
@@ -326,21 +326,21 @@ export function RoleCard({ role, catalog }: { role: RoleOption; catalog: ScopeCa
               .join(" · ") || "Nada asignado";
 
   return (
-    <li className="rounded-lg border border-slate-200 bg-white p-4">
+    <li className="rounded-lg border border-line bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-semibold text-brand-dark">
+          <p className="font-semibold text-heading">
             {role.name}
-            {role.system && <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-normal text-slate-600">base</span>}
+            {role.system && <span className="ml-2 rounded bg-surface-3 px-1.5 py-0.5 text-[11px] font-normal text-ink-2">base</span>}
           </p>
-          <p className="text-[13px] text-slate-600">{LEVEL_TEXT[role.level]}</p>
-          <p className="mt-1 text-[13px] text-slate-700">
-            <span className="text-slate-500">Ve:</span> {scopeText}
+          <p className="text-[13px] text-ink-2">{LEVEL_TEXT[role.level]}</p>
+          <p className="mt-1 text-[13px] text-ink-2">
+            <span className="text-muted">Ve:</span> {scopeText}
           </p>
-          {role.description && <p className="mt-1 text-xs text-slate-500">{role.description}</p>}
+          {role.description && <p className="mt-1 text-xs text-muted">{role.description}</p>}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <span className="rounded-full bg-brand-tint px-2.5 py-1 text-xs text-brand-dark">
+          <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs text-heading">
             {role.users} usuario{role.users === 1 ? "" : "s"}
           </span>
           <button type="button" className="btn-secondary text-sm" onClick={() => setEditing((e) => !e)}>
@@ -361,7 +361,7 @@ export function RoleCard({ role, catalog }: { role: RoleOption; catalog: ScopeCa
       </div>
       <Feedback state={delState} />
       {editing && (
-        <div className="mt-4 border-t border-slate-100 pt-4">
+        <div className="mt-4 border-t border-line pt-4">
           <RoleForm role={role} catalog={catalog} onDone={() => setEditing(false)} />
         </div>
       )}

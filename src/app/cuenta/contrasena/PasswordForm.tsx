@@ -17,7 +17,7 @@ export function PasswordForm() {
   return (
     <form action={action} className="space-y-4">
       <label className="block text-sm">
-        <span className="mb-1 block text-slate-700">Nueva contraseña</span>
+        <span className="mb-1 block text-ink-2">Nueva contraseña</span>
         <input
           type="password"
           name="password"
@@ -26,12 +26,12 @@ export function PasswordForm() {
           autoComplete="new-password"
           className="field"
         />
-        <span className="mt-1 block text-xs text-slate-500">
+        <span className="mt-1 block text-xs text-muted">
           Mínimo 10 caracteres, con letras y al menos un número.
         </span>
       </label>
       <label className="block text-sm">
-        <span className="mb-1 block text-slate-700">Repita la contraseña</span>
+        <span className="mb-1 block text-ink-2">Repita la contraseña</span>
         <input
           type="password"
           name="confirm"
@@ -41,7 +41,7 @@ export function PasswordForm() {
           className="field"
         />
       </label>
-      <p role="alert" className="min-h-5 text-sm text-status-red">
+      <p role="alert" className="min-h-5 text-sm text-over">
         {state.error}
       </p>
       <Submit />

@@ -26,18 +26,18 @@ export default function DemoExport({
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-brand-dark">Módulo de exportación</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-bold text-heading">Módulo de exportación</h1>
+        <p className="text-sm text-muted">
           Descarga un CSV limpio con las novedades de horas extras depuradas,
           listo para el software de nómina.
         </p>
       </header>
 
       <div className="card">
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-ink-2">
           Periodo: <strong>{MONTHS[period.month - 1]} {period.year}</strong>
         </p>
-        <ul className="mt-3 space-y-1 text-sm text-slate-600">
+        <ul className="mt-3 space-y-1 text-sm text-ink-2">
           <li>✅ {exportable.length} empleados con novedades de horas extra</li>
           <li>⚠ {excluded.length} registros excluidos por error (revisión manual)</li>
         </ul>
@@ -47,8 +47,8 @@ export default function DemoExport({
       </div>
 
       <div className="card overflow-x-auto p-0">
-        <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+        <table className="min-w-full divide-y divide-line text-sm">
+          <thead className="bg-surface-2 text-left text-xs uppercase tracking-wide text-muted">
             <tr>
               <th className="px-4 py-3 font-medium">ID</th>
               <th className="px-4 py-3 font-medium">Nombre</th>
@@ -57,7 +57,7 @@ export default function DemoExport({
               <th className="px-4 py-3 font-medium">Estado</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-line">
             {exportable.map((s) => (
               <tr key={s.id}>
                 <td className="px-4 py-2">{s.code}</td>

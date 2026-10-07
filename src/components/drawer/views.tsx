@@ -1,26 +1,24 @@
 "use client";
 
 import clsx from "clsx";
-import { LEVEL_LABELS, LevelIcon, PendingIcon, StatusBadge } from "../StatusBadge";
+import {
+  LEVEL_LABELS,
+  LEVEL_SOLID,
+  LEVEL_TEXT,
+  LevelIcon,
+  PendingIcon,
+  StatusBadge,
+} from "../StatusBadge";
 import { CumulativeChart } from "../charts/CumulativeChart";
+import { AnimatedNumber } from "../ui/AnimatedNumber";
+import { Icon } from "../ui/Icon";
 import { fmtH, RULES } from "@/lib/overtime";
 import type { EmployeeStatus, SegmentPoint } from "@/lib/aggregate";
 import type { SemaphoreLevel } from "@/lib/types";
 import type { DrawerView, GroupDim, Segment } from "./context";
 
-const TEXT: Record<SemaphoreLevel, string> = {
-  green: "text-status-green",
-  yellow: "text-status-yellow",
-  red: "text-status-red",
-};
-
+const TEXT = LEVEL_TEXT;
 const LEVEL_LABEL = LEVEL_LABELS;
-
-const DOT: Record<SemaphoreLevel, string> = {
-  green: "bg-status-green",
-  yellow: "bg-status-yellow",
-  red: "bg-status-red",
-};
 
 /** Parámetro de URL y dependientes a limpiar para cada dimensión. */
 export const DIM_FILTER: Record<GroupDim, { param: string; clear: string[]; label: string }> = {
@@ -65,35 +63,63 @@ export const SEGMENT_TEXT: Record<Segment, { title: string; desc: string }> = {
   },
 };
 
+/** Color del acumulado frente a la meta a esa fecha y al límite del mes. */
+function accCls(acc: number, target: number): string {
+  if (acc > RULES.MONTHLY_OVERTIME_LIMIT) return "font-semibold text-over";
+  if (Math.round(acc * 10) > Math.round(target * 10)) return "font-semibold text-risk";
+  return "text-ink-2";
+}
+
 /* ---------------------------------------------------------------- */
 
+type StatTone = SemaphoreLevel | "pending";
+
+const STAT_BAR: Record<StatTone, string> = {
+  green: "bg-ok-solid",
+  yellow: "bg-risk-solid",
+  red: "bg-over-solid",
+  pending: "bg-pending-solid",
+};
+const STAT_TEXT: Record<StatTone, string> = {
+  green: "text-ok",
+  yellow: "text-risk",
+  red: "text-over",
+  pending: "text-pending",
+};
+
+/** Cifra del panel: cuenta hasta su valor y lleva la barra del estado arriba. */
 function Stat({
   label,
   value,
+  decimals = 1,
+  suffix = "h",
+  prefix = "",
   tone,
   hint,
 }: {
   label: string;
-  value: string;
-  tone?: "red" | "yellow";
+  value: number;
+  decimals?: number;
+  suffix?: string;
+  prefix?: string;
+  /** Solo cuando la cifra es una alerta (si no, va en tinta normal). */
+  tone?: StatTone;
   hint?: string;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 p-3">
-      <p className="text-xs leading-snug text-slate-600">{label}</p>
-      <p
-        className={clsx(
-          "mt-0.5 text-lg font-semibold tabular-nums",
-          tone === "red"
-            ? "text-status-red"
-            : tone === "yellow"
-              ? "text-status-yellow"
-              : "text-brand-dark"
-        )}
-      >
-        {value}
+    <div className="relative overflow-hidden rounded-control border border-line bg-surface p-3">
+      {tone && (
+        <span aria-hidden className={clsx("print-exact absolute inset-x-0 top-0 h-[3px]", STAT_BAR[tone])} />
+      )}
+      <p className="flex items-center gap-1.5 text-caption text-ink-2">
+        {tone && tone !== "pending" && <LevelIcon level={tone} className={STAT_TEXT[tone]} />}
+        {tone === "pending" && <PendingIcon className="text-pending" />}
+        {label}
       </p>
-      {hint && <p className="text-[11px] text-slate-500">{hint}</p>}
+      <p className={clsx("mt-1 text-[1.375rem] font-bold leading-tight tabular-nums", tone ? STAT_TEXT[tone] : "text-heading")}>
+        <AnimatedNumber value={value} decimals={decimals} suffix={suffix} prefix={prefix} />
+      </p>
+      {hint && <p className="mt-0.5 text-caption font-normal text-muted">{hint}</p>}
     </div>
   );
 }
@@ -102,31 +128,36 @@ function Stat({
 export function PersonRow({
   s,
   value,
+  detail,
   onClick,
   showArea = true,
+  index = 0,
 }: {
   s: EmployeeStatus;
   value: string;
+  /** Segunda línea a la derecha, p. ej. «lleva 38,0h». */
+  detail?: string;
   onClick: () => void;
   showArea?: boolean;
+  /** Posición en la lista, para el escalonado de entrada (máx. 150ms). */
+  index?: number;
 }) {
   return (
-    <li>
+    <li className="reveal" style={{ "--i": Math.min(index, 5) } as React.CSSProperties}>
       <button
         type="button"
         onClick={onClick}
-        className="group flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition hover:bg-brand-tint"
+        data-drawer-key={`emp:${s.id}`}
+        className="group flex min-h-14 w-full items-center gap-3 rounded-control px-2 py-2.5 text-left transition-colors duration-fast hover:bg-primary-soft active:bg-primary-soft"
       >
-        <LevelIcon level={s.level} className={TEXT[s.level]} />
+        <LevelIcon level={s.level} className={clsx("h-3 w-3", TEXT[s.level])} />
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
-            <span className="truncate text-sm font-medium text-slate-900">
-              {s.name ?? s.code}
-            </span>
+            <span className="truncate text-ui text-ink">{s.name ?? s.code}</span>
             <span className="sr-only">({LEVEL_LABEL[s.level]})</span>
             {s.hasError && (
               <span
-                className="inline-flex shrink-0 items-center gap-0.5 text-[11px] font-medium text-violet-700"
+                className="inline-flex shrink-0 items-center gap-0.5 text-caption font-semibold text-pending"
                 title="Tiene registros congelados por revisar"
               >
                 <PendingIcon className="h-2.5 w-2.5" />
@@ -135,20 +166,21 @@ export function PersonRow({
             )}
           </span>
           {showArea && (
-            <span className="block truncate text-xs text-slate-600">
+            <span className="block truncate text-caption font-normal text-ink-2">
               {[s.area, s.managerName].filter(Boolean).join(" · ") || "—"}
             </span>
           )}
         </span>
-        <span className="shrink-0 text-sm font-semibold tabular-nums text-brand-dark">
-          {value}
+        <span className="shrink-0 text-right">
+          <span className={clsx("block text-ui tabular-nums", s.level === "green" ? "text-heading" : TEXT[s.level])}>
+            {value}
+          </span>
+          {detail && <span className="block text-caption font-normal tabular-nums text-muted">{detail}</span>}
         </span>
-        <span
-          className="shrink-0 text-slate-500 transition-transform group-hover:translate-x-0.5"
-          aria-hidden
-        >
-          ›
-        </span>
+        <Icon
+          name="chevron-right"
+          className="h-4 w-4 shrink-0 text-muted transition-transform duration-fast ease-enter group-hover:translate-x-0.5"
+        />
       </button>
     </li>
   );
@@ -157,33 +189,57 @@ export function PersonRow({
 /** Barra apilada verde/naranja/rojo con la distribución del semáforo. */
 function Distribution({ members }: { members: EmployeeStatus[] }) {
   const n = members.length || 1;
-  const parts: { level: SemaphoreLevel; label: string; count: number }[] = [
-    { level: "green", label: "Normal", count: members.filter((m) => m.level === "green").length },
-    { level: "yellow", label: "En riesgo", count: members.filter((m) => m.level === "yellow").length },
-    { level: "red", label: "Excedido", count: members.filter((m) => m.level === "red").length },
-  ];
+  const parts: { level: SemaphoreLevel; count: number }[] = (["green", "yellow", "red"] as const).map(
+    (level) => ({ level, count: members.filter((m) => m.level === level).length })
+  );
   return (
     <div>
-      <div className="flex h-3 w-full overflow-hidden rounded-full bg-slate-100">
-        {parts.map((p) =>
-          p.count > 0 ? (
-            <div
-              key={p.level}
-              className={clsx("h-full origin-left motion-safe:animate-grow-x", DOT[p.level])}
-              style={{ width: `${(p.count / n) * 100}%` }}
-              title={`${p.label}: ${p.count}`}
-            />
-          ) : null
-        )}
+      <div
+        className="print-exact flex h-3 w-full overflow-hidden rounded-full bg-surface-3"
+        role="img"
+        aria-label={parts.map((p) => `${LEVEL_LABEL[p.level]}: ${p.count}`).join(", ")}
+      >
+        {/* El contenedor redondeado recorta; el que crece es el interior. */}
+        <div className="flex h-full w-full origin-left motion-safe:animate-grow-x">
+          {parts.map((p) =>
+            p.count > 0 ? (
+              <div
+                key={p.level}
+                className={clsx(
+                  "print-exact h-full transition-[width] duration-slow ease-move [&+&]:border-l-2 [&+&]:border-surface",
+                  LEVEL_SOLID[p.level]
+                )}
+                style={{ width: `${(p.count / n) * 100}%` }}
+                title={`${LEVEL_LABEL[p.level]}: ${p.count}`}
+              />
+            ) : null
+          )}
+        </div>
       </div>
-      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+      <ul className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-small text-ink-2">
         {parts.map((p) => (
           <li key={p.level} className="flex items-center gap-1.5">
-            <span className={clsx("h-2 w-2 rounded-full", DOT[p.level])} aria-hidden />
-            {p.label}: <strong className="tabular-nums text-slate-800">{p.count}</strong>
+            <LevelIcon level={p.level} className={TEXT[p.level]} />
+            {LEVEL_LABEL[p.level]}: <strong className="tabular-nums text-ink">{p.count}</strong>
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** Lista vacía con una ilustración sencilla (figuras de marca). */
+function EmptyState({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="flex flex-col items-center rounded-card border border-dashed border-line px-4 py-6 text-center">
+      <svg viewBox="0 0 96 64" className="h-14 w-20 text-brand dark:text-brand-300" aria-hidden focusable="false">
+        <circle cx="34" cy="34" r="22" fill="currentColor" opacity="0.12" />
+        <path d="M62 14 84 52H40Z" fill="currentColor" opacity="0.18" />
+        <circle cx="46" cy="30" r="11" fill="none" stroke="currentColor" strokeWidth="3" />
+        <path d="m54 38 9 9" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
+      </svg>
+      <p className="mt-2 text-ui font-semibold text-heading">{title}</p>
+      <p className="mt-1 max-w-[36ch] text-small text-ink-2">{text}</p>
     </div>
   );
 }
@@ -228,17 +284,21 @@ export function EmployeeQuickView({
     { dim: "jefe", value: s.managerName },
   ];
   const withData = segments.filter((x) => !x.future);
+  const accTone: StatTone | undefined =
+    s.level === "red" ? "red" : s.risk === "meta" ? "yellow" : undefined;
 
   return (
-    <div className="space-y-5 motion-safe:animate-fade-in">
-      <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge level={s.level} pending={s.pendingReviewCount} />
-        <span className="text-[13px] text-slate-600">
-          ID {s.code}
-          {s.roleTitle ? ` · ${s.roleTitle}` : ""}
-        </span>
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge level={s.level} pending={s.pendingReviewCount} />
+          <span className="text-small text-ink-2">
+            ID {s.code}
+            {s.roleTitle ? ` · ${s.roleTitle}` : ""}
+          </span>
+        </div>
+        <p className={clsx("text-ui", TEXT[s.level])}>{statusLine(s, period)}</p>
       </div>
-      <p className={clsx("text-sm font-medium", TEXT[s.level])}>{statusLine(s, period)}</p>
 
       {/* Contexto organizacional: cada dato abre su grupo. */}
       <div className="flex flex-wrap gap-2">
@@ -248,12 +308,17 @@ export function EmployeeQuickView({
             <button
               key={c.dim}
               type="button"
+              data-drawer-key={`grp:${c.dim}`}
               onClick={() => push(groupView(c.dim, c.value!))}
-              className="inline-flex min-h-9 max-w-full items-center gap-1 rounded-full bg-brand-tint px-3 py-1 text-xs text-brand-dark transition hover:bg-brand/20"
+              className="chip-brand chip-interactive group"
               title={`Ver a todas las personas de ${c.value}`}
             >
-              <span className="text-slate-600">{DIM_FILTER[c.dim].label}:</span>
-              <strong className="truncate font-semibold">{c.value}</strong>
+              <span className="text-ink-2">{DIM_FILTER[c.dim].label}:</span>
+              <strong className="min-w-0 truncate font-semibold">{c.value}</strong>
+              <Icon
+                name="chevron-right"
+                className="h-3.5 w-3.5 shrink-0 opacity-70 transition-transform duration-fast group-hover:translate-x-0.5"
+              />
             </button>
           ))}
       </div>
@@ -261,29 +326,49 @@ export function EmployeeQuickView({
       <div className="grid grid-cols-2 gap-3">
         <Stat
           label={`Acumulado${period.cutoffLabel ? ` al ${period.cutoffLabel}` : ""}`}
-          value={fmtH(s.monthlyOvertime)}
+          value={s.monthlyOvertime}
           hint={`Meta a esa fecha: ${fmtH(s.target)}`}
-          tone={s.level === "red" ? "red" : s.risk === "meta" ? "yellow" : undefined}
+          tone={accTone}
         />
         <Stat
           label={period.closed ? "Cierre del mes" : "Proyección de cierre"}
-          value={`${period.closed ? "" : "≈"}${fmtH(s.projectedMonthlyOvertime)}`}
+          value={s.projectedMonthlyOvertime}
+          prefix={period.closed ? "" : "≈"}
           hint={period.closed ? undefined : s.projectionReliable ? "a su ritmo diario" : "pocos datos: no decide"}
           tone={!period.closed && s.willExceedMonthly ? "yellow" : undefined}
         />
       </div>
 
       {s.pendingReviewCount > 0 && (
-        <p className="rounded-md bg-violet-50 px-2 py-1.5 text-xs text-violet-800">
-          Con {s.pendingReviewCount} registro{s.pendingReviewCount > 1 ? "s" : ""} por
-          revisar, el mes quedaría entre {fmtH(s.monthlyOvertime)} y{" "}
-          {fmtH(s.potentialMonthlyOvertime)} según se resuelva
-          {s.pendingReviewCount > 1 ? "n" : ""}.
+        <p className="flex items-start gap-2 rounded-control border border-pending-border bg-pending-soft px-3 py-2 text-small text-pending">
+          <PendingIcon className="mt-0.5 h-3.5 w-3.5" />
+          <span>
+            Con {s.pendingReviewCount} registro{s.pendingReviewCount > 1 ? "s" : ""} por
+            revisar, el mes quedaría entre {fmtH(s.monthlyOvertime)} y{" "}
+            {fmtH(s.potentialMonthlyOvertime)} según se resuelva
+            {s.pendingReviewCount > 1 ? "n" : ""}.
+          </span>
         </p>
       )}
 
-      <section className="rounded-xl border border-slate-200 bg-white p-3">
-        <h3 className="mb-1 text-sm font-semibold text-brand-dark">Acumulado frente a la meta</h3>
+      {s.reasons.length > 0 && (
+        <section aria-labelledby={`motivos-${s.id}`}>
+          <h3 id={`motivos-${s.id}`} className="mb-1.5 text-ui font-semibold text-heading">
+            Por qué está en este estado
+          </h3>
+          <ul className="space-y-1.5">
+            {s.reasons.map((r, i) => (
+              <li key={i} className="flex gap-2 text-small leading-snug text-ink-2">
+                <LevelIcon level={s.level} className={clsx("mt-1", TEXT[s.level])} />
+                {r}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="rounded-card border border-line bg-surface p-3">
+        <h3 className="mb-1 text-ui font-semibold text-heading">Acumulado frente a la meta</h3>
         <CumulativeChart
           segments={segments}
           daysInMonth={period.daysInMonth}
@@ -293,58 +378,55 @@ export function EmployeeQuickView({
       </section>
 
       <section>
-        <h3 className="mb-2 text-sm font-semibold text-brand-dark">¿Cuándo hizo esas horas?</h3>
+        <h3 className="mb-1 text-ui font-semibold text-heading">¿Cuándo hizo esas horas?</h3>
         {withData.length === 0 ? (
-          <p className="text-sm text-slate-600">Sin datos cargados este mes.</p>
+          <p className="text-small text-ink-2">Sin datos cargados este mes.</p>
         ) : (
-          <ul className="divide-y divide-slate-100 text-sm">
+          <ul className="divide-y divide-line">
             {withData.map((w) => (
-              <li key={w.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
-                <span className="min-w-[6.5rem] text-slate-700">{w.short}</span>
-                {w.pending ? (
-                  <span className="rounded-md border border-dashed border-violet-300 bg-violet-50 px-2 py-0.5 text-xs text-violet-800">
-                    congelado{w.grossHours ? ` · ${w.grossHours.toFixed(0)}h brutas` : ""} sin validar
-                  </span>
-                ) : w.discarded && w.hours === 0 ? (
-                  <span className="rounded-md border border-dashed border-slate-300 px-2 py-0.5 text-xs text-slate-600">
-                    descartado · no suma
-                  </span>
-                ) : (
-                  <span className="font-semibold tabular-nums text-slate-800">{fmtH(w.hours)}</span>
-                )}
-                <span className="text-xs text-slate-500">meta {fmtH(w.segmentTarget)}</span>
-                {w.weekHigh && (
-                  <span
-                    className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-700"
-                    title={w.weekShared ? "Semana completa, compartida con otro mes" : undefined}
-                  >
-                    Semana &gt; {RULES.WEEKLY_OVERTIME_LIMIT}h ({fmtH(w.weekHours)})
-                  </span>
-                )}
-                {w.estimated && (
-                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-800">estimado</span>
+              <li key={w.key} className="py-2.5">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                  <span className="text-ui text-ink">{w.short}</span>
+                  {w.pending ? (
+                    <span className="chip-pending border-dashed">
+                      <PendingIcon />
+                      congelado{w.grossHours ? ` · ${w.grossHours.toFixed(0)}h brutas` : ""} sin validar
+                    </span>
+                  ) : w.discarded && w.hours === 0 ? (
+                    <span className="chip border-dashed">descartado · no suma</span>
+                  ) : (
+                    <span className="text-small text-ink-2">
+                      <strong className="text-ui tabular-nums text-ink">{fmtH(w.hours)}</strong> en el tramo
+                    </span>
+                  )}
+                </div>
+                <p className="mt-0.5 text-caption font-normal tabular-nums text-muted">
+                  acumulado <span className={accCls(w.cumulative, w.target)}>{fmtH(w.cumulative)}</span>
+                  {" · "}meta a la fecha {fmtH(w.target)}
+                </p>
+                {(w.weekHigh || w.estimated) && (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {w.weekHigh && (
+                      <span
+                        className="chip-info"
+                        title={`Informativa: no cambia el estado${w.weekShared ? ". Semana completa, compartida con otro mes" : ""}`}
+                      >
+                        <Icon name="info" className="h-3 w-3" />
+                        Semana &gt; {RULES.WEEKLY_OVERTIME_LIMIT}h ({fmtH(w.weekHours)})
+                      </span>
+                    )}
+                    {w.estimated && (
+                      <span className="chip" title="Semana que cruza de mes sin detalle por día: horas repartidas por días">
+                        estimado
+                      </span>
+                    )}
+                  </div>
                 )}
               </li>
             ))}
           </ul>
         )}
       </section>
-
-      {s.reasons.length > 0 && (
-        <section>
-          <h3 className="mb-2 text-sm font-semibold text-brand-dark">
-            Por qué está en este estado
-          </h3>
-          <ul className="space-y-1.5">
-            {s.reasons.map((r, i) => (
-              <li key={i} className="flex gap-2 text-sm leading-snug text-slate-700">
-                <span className={clsx("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", DOT[s.level])} aria-hidden />
-                {r}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
     </div>
   );
 }
@@ -364,34 +446,34 @@ export function GroupQuickView({
   const risk = members.filter((m) => m.level === "yellow").length;
 
   return (
-    <div className="space-y-5 motion-safe:animate-fade-in">
+    <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3">
-        <Stat label="Personas" value={String(n)} />
-        <Stat label="Horas extra del mes" value={fmtH(total)} />
-        <Stat label="Excedieron 48h" value={String(red)} tone={red > 0 ? "red" : undefined} />
-        <Stat label="En riesgo" value={String(risk)} tone={risk > 0 ? "yellow" : undefined} />
+        <Stat label="Personas" value={n} decimals={0} suffix="" />
+        <Stat
+          label="Horas extra del mes"
+          value={total}
+          hint={`Promedio ${fmtH(n > 0 ? total / n : 0)} por persona`}
+        />
+        <Stat label="Excedieron 48h" value={red} decimals={0} suffix="" tone={red > 0 ? "red" : undefined} />
+        <Stat label="En riesgo" value={risk} decimals={0} suffix="" tone={risk > 0 ? "yellow" : undefined} />
       </div>
 
       <section>
-        <h3 className="mb-2 text-sm font-semibold text-brand-dark">Estado del grupo</h3>
+        <h3 className="mb-2 text-ui font-semibold text-heading">Estado del grupo</h3>
         <Distribution members={members} />
-        <p className="mt-2 text-xs text-slate-600">
-          Promedio {fmtH(n > 0 ? total / n : 0)} por persona
-        </p>
       </section>
 
       <section>
-        <h3 className="mb-1 text-sm font-semibold text-brand-dark">
-          Personas ({n})
-        </h3>
+        <h3 className="mb-1 text-ui font-semibold text-heading">Personas ({n})</h3>
         {n === 0 ? (
-          <p className="text-sm text-slate-600">Sin personas en este grupo.</p>
+          <EmptyState title="Sin personas en este grupo" text="Con los filtros actuales nadie pertenece a este grupo." />
         ) : (
-          <ul className="-mx-2 divide-y divide-slate-100">
-            {members.map((m) => (
+          <ul className="-mx-2 divide-y divide-line">
+            {members.map((m, i) => (
               <PersonRow
                 key={m.id}
                 s={m}
+                index={i}
                 value={fmtH(m.monthlyOvertime)}
                 showArea={dim !== "area"}
                 onClick={() => push({ kind: "employee", id: m.id })}
@@ -421,24 +503,27 @@ export function SegmentQuickView({
       : segment === "weeklyHigh"
         ? `${m.highWeeksMonth} sem. >${RULES.WEEKLY_OVERTIME_LIMIT}h`
         : fmtH(m.monthlyOvertime);
+  // En estas listas la cifra principal no es el acumulado: se añade debajo.
+  const detailOf = (m: EmployeeStatus) =>
+    segment === "yellow" || segment === "weeklyHigh" ? `lleva ${fmtH(m.monthlyOvertime)}` : undefined;
 
   return (
-    <div className="space-y-4 motion-safe:animate-fade-in">
-      <p className="text-sm leading-relaxed text-slate-600">{SEGMENT_TEXT[segment].desc}</p>
+    <div className="space-y-4">
+      <p className="text-small leading-relaxed text-ink-2">{SEGMENT_TEXT[segment].desc}</p>
       {members.length === 0 ? (
-        <div className="rounded-lg border border-slate-200 p-4 text-center">
-          <p className="text-sm font-medium text-brand-dark">Nadie en esta lista</p>
-          <p className="mt-1 text-sm text-slate-600">
-            Con los filtros actuales no hay personas en esta condición.
-          </p>
-        </div>
+        <EmptyState
+          title="Nadie en esta lista"
+          text="Con los filtros actuales no hay personas en esta condición."
+        />
       ) : (
-        <ul className="-mx-2 divide-y divide-slate-100">
-          {members.map((m) => (
+        <ul className="-mx-2 divide-y divide-line">
+          {members.map((m, i) => (
             <PersonRow
               key={m.id}
               s={m}
+              index={i}
               value={valueOf(m)}
+              detail={detailOf(m)}
               onClick={() => push({ kind: "employee", id: m.id })}
             />
           ))}

@@ -36,40 +36,40 @@ export default async function RevisionesPage() {
       />
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold text-brand-dark">
+        <h2 className="mb-3 text-lg font-semibold text-heading">
           Pendientes ({pendientes.length})
         </h2>
         {pendientes.length === 0 ? (
           <div className="card text-center">
-            <p className="text-sm font-medium text-brand-dark">Todo al día</p>
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="text-sm font-medium text-heading">Todo al día</p>
+            <p className="mt-1 text-sm text-ink-2">
               No hay registros congelados por revisar.
             </p>
           </div>
         ) : (
           <div className="space-y-4">
             {pendientes.map((r) => (
-              <div key={r.id} className="card border-amber-200 bg-amber-50">
+              <div key={r.id} className="card border-risk-border bg-risk-soft">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <div className="font-medium text-slate-900">
+                    <div className="font-medium text-ink">
                       {r.employees?.name ?? r.employees?.code} · {r.employees?.area ?? "—"}
                     </div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-muted">
                       {segmentOfWeek(r.year, r.month, r.week)?.label ?? `Semana ${r.week}`} {r.year} · Total cargado{" "}
                       {Number(r.total_hours).toFixed(1)}h · Turno máx{" "}
                       {r.max_shift_hours != null ? `${Number(r.max_shift_hours).toFixed(1)}h` : "—"}
                     </div>
-                    <div className="mt-1 text-xs font-medium text-amber-700">
+                    <div className="mt-1 text-xs font-medium text-risk">
                       {r.error_reason}
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <form action={corregirRegistro} className="rounded-lg border border-slate-200 bg-white p-3">
+                  <form action={corregirRegistro} className="rounded-lg border border-line bg-surface p-3">
                     <input type="hidden" name="id" value={r.id} />
-                    <p className="mb-2 text-xs font-semibold text-slate-600">Corregir horas</p>
+                    <p className="mb-2 text-xs font-semibold text-ink-2">Corregir horas</p>
                     <div className="flex items-center gap-2">
                       <input
                         name="horas"
@@ -80,7 +80,7 @@ export default async function RevisionesPage() {
                         className="field w-28"
                         required
                       />
-                      <span className="text-[13px] text-slate-600">horas reales</span>
+                      <span className="text-[13px] text-ink-2">horas reales</span>
                     </div>
                     <input
                       name="nota"
@@ -94,9 +94,9 @@ export default async function RevisionesPage() {
                     />
                   </form>
 
-                  <form action={descartarRegistro} className="rounded-lg border border-slate-200 bg-white p-3">
+                  <form action={descartarRegistro} className="rounded-lg border border-line bg-surface p-3">
                     <input type="hidden" name="id" value={r.id} />
-                    <p className="mb-2 text-xs font-semibold text-slate-600">Descartar</p>
+                    <p className="mb-2 text-xs font-semibold text-ink-2">Descartar</p>
                     <input
                       name="nota"
                       placeholder="Motivo del descarte"
@@ -118,12 +118,12 @@ export default async function RevisionesPage() {
 
       {revisados.length > 0 && (
         <section>
-          <h2 className="mb-3 text-lg font-semibold text-brand-dark">
+          <h2 className="mb-3 text-lg font-semibold text-heading">
             Historial de revisiones ({revisados.length})
           </h2>
           <div className="card overflow-x-auto p-0">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+            <table className="min-w-full divide-y divide-line text-sm">
+              <thead className="bg-surface-2 text-left text-xs uppercase text-muted">
                 <tr>
                   <th className="px-4 py-2 font-medium">Empleado</th>
                   <th className="px-4 py-2 font-medium">Periodo</th>
@@ -131,27 +131,27 @@ export default async function RevisionesPage() {
                   <th className="px-4 py-2 font-medium">Motivo</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {revisados.map((r) => (
                   <tr key={r.id}>
                     <td className="px-4 py-2">
                       {r.employees?.name ?? r.employees?.code}
                     </td>
-                    <td className="px-4 py-2 text-slate-500">
+                    <td className="px-4 py-2 text-muted">
                       {segmentOfWeek(r.year, r.month, r.week)?.short ?? `Sem ${r.week}`} {r.year}
                     </td>
                     <td className="px-4 py-2">
                       <span
                         className={
                           r.review_status === "corregido"
-                            ? "text-status-green"
-                            : "text-slate-500"
+                            ? "text-ok"
+                            : "text-muted"
                         }
                       >
                         {r.review_status === "corregido" ? "Corregido" : "Descartado"}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-slate-500">{r.review_note ?? "—"}</td>
+                    <td className="px-4 py-2 text-muted">{r.review_note ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>

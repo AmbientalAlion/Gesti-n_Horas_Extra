@@ -6,10 +6,11 @@ import type { Role } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+// El rol ya va en la etiqueta del encabezado; aquí solo el alcance.
 const ROLE_LABEL: Record<Role, string> = {
-  rrhh: "Recursos Humanos · toda la organización",
-  director: "Director · Dirección Industrial",
-  jefe: "Jefe inmediato · su equipo directo",
+  rrhh: "Toda la organización",
+  director: "Dirección Industrial",
+  jefe: "Su equipo directo",
 };
 
 export default function DemoDashboard({

@@ -29,17 +29,29 @@ export type DrawerView =
   | { kind: "segment"; segment: Segment };
 
 export interface DrawerApi {
-  /** Abre el panel con una vista nueva (reinicia el historial). */
-  open: (v: DrawerView) => void;
+  /**
+   * Abre el panel con una vista nueva (reinicia el historial). `opener` es el
+   * elemento que recibe el foco al cerrar; si se omite, se usa el que tenía
+   * el foco (o el enlace de la fila de esa persona, si el foco estaba en body).
+   */
+  open: (v: DrawerView, opener?: HTMLElement | null) => void;
   /** Navega dentro del panel (permite «← Volver»). */
   push: (v: DrawerView) => void;
   close: () => void;
+  /** Persona abierta ahora en el panel (para marcar su fila), o null. */
+  activeEmployeeId: string | null;
   statuses: EmployeeStatus[];
   segmentsByEmployee: Record<string, SegmentPoint[]>;
   period: DrawerPeriod;
   /** Enlace a la ficha completa, conservando filtros y rol. */
   fichaHref: (id: string) => string;
 }
+
+/**
+ * sessionStorage: desde qué URL del panel se abrió una ficha
+ * ({ from, ficha }); «Volver» en la ficha la usa para volver con el historial.
+ */
+export const FICHA_FROM_KEY = "horas:ficha-desde";
 
 export const DrawerContext = createContext<DrawerApi | null>(null);
 

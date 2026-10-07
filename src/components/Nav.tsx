@@ -1,104 +1,100 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import clsx from "clsx";
+import { useState } from "react";
 import type { Role } from "@/lib/types";
 import { signOut } from "@/app/login/actions";
-import { BrandMark, Claim } from "@/components/brand/BrandMark";
+import { Claim } from "@/components/brand/BrandMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Icon } from "@/components/ui/Icon";
+import { AppChrome } from "@/components/nav/AppChrome";
+import { Popover, POPOVER_ITEM } from "@/components/nav/Popover";
+import { ROLE_LABELS, sectionsFor } from "@/components/nav/sections";
 
 interface NavProps {
   role: Role | "demo";
   /** Nombre del rol de acceso (p. ej. «Director Industrial»). */
   roleName?: string;
+  /** Correo de la sesión, para el menú de cuenta. */
+  email?: string;
 }
 
-const ROLE_LABELS: Record<Role | "demo", string> = {
-  rrhh: "Recursos Humanos",
-  director: "Director",
-  jefe: "Jefe Inmediato",
-  demo: "Modo demostración",
-};
-
-export function Nav({ role, roleName }: NavProps) {
-  const pathname = usePathname();
+/**
+ * Navegación de la app autenticada. Recursos Humanos (y el modo sin
+ * Supabase) ve Panel, Cargar, Revisiones, Exportar y Usuarios; director y
+ * jefe solo el panel, así que en el teléfono no llevan barra inferior.
+ */
+export function Nav({ role, roleName, email }: NavProps) {
   const isRrhh = role === "rrhh" || role === "demo";
+  const sections = sectionsFor(isRrhh);
+  const roleLabel = roleName ?? ROLE_LABELS[role];
+  const canManageAccount = role !== "demo";
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  // Cargar, exportar, revisar y administrar son acciones de RRHH.
-  const links = [
-    { href: "/dashboard", label: "Dashboard" },
-    ...(isRrhh
-      ? [
-          { href: "/upload", label: "Cargar archivo" },
-          { href: "/revisiones", label: "Registros por revisar" },
-          { href: "/export", label: "Exportar a nómina" },
-          { href: "/admin", label: "Usuarios y accesos" },
-        ]
-      : []),
-  ];
+  const accountItems = canManageAccount && (
+    <>
+      <a href="/cuenta/contrasena" className={POPOVER_ITEM}>
+        <Icon name="key" className="h-5 w-5 text-muted" />
+        Cambiar contraseña
+      </a>
+      <form action={signOut}>
+        <button type="submit" className={POPOVER_ITEM}>
+          <Icon name="logout" className="h-5 w-5 text-muted" />
+          Cerrar sesión
+        </button>
+      </form>
+    </>
+  );
 
   return (
-    <aside className="sticky top-0 z-40 flex w-full shrink-0 flex-col border-b border-slate-200 bg-white print:hidden lg:h-screen lg:w-60 lg:overflow-y-auto lg:border-b-0 lg:border-r">
-      <div className="border-b border-slate-200 px-4 py-2.5 lg:px-5 lg:py-5">
-        <div className="flex items-center justify-between gap-2 lg:items-start">
-          <BrandMark size="md" />
-        </div>
-        {/* En teléfono el encabezado se reduce para no comerse la pantalla. */}
-        <div className="mt-2 hidden text-xs text-slate-500 lg:block">
-          Control de Horas Extras
-        </div>
-        <Claim className="mt-1 hidden text-[11px] lg:block" />
-      </div>
-      <nav className="flex gap-1 overflow-x-auto p-2 lg:flex-1 lg:flex-col lg:gap-0 lg:space-y-1 lg:overflow-visible lg:p-3">
-        {links.map((link) => {
-          const active = pathname === link.href;
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              aria-current={active ? "page" : undefined}
-              className={clsx(
-                "flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition",
-                active
-                  ? "bg-brand text-white"
-                  : "text-slate-600 hover:bg-slate-100"
-              )}
-            >
-              {link.label}
-            </Link>
-          );
-        })}
-      </nav>
-      <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-4 py-2 lg:block lg:px-5 lg:py-4">
-        <div className="lg:mb-3"><ThemeToggle /></div>
-        <div className="flex items-center gap-3 lg:block">
-          <div>
-            <div className="hidden text-xs text-slate-500 lg:block">Rol</div>
-            <div className="text-[13px] font-medium text-slate-700 lg:text-sm">
-              {roleName ?? ROLE_LABELS[role]}
-            </div>
+    <AppChrome
+      base=""
+      sections={sections}
+      pinTopBar={menuOpen}
+      sidebarFooter={
+        <div className="space-y-1">
+          <div className="px-3 pb-2">
+            <p className="text-caption text-muted">Sesión</p>
+            <span className="chip-brand mt-1 max-w-full font-semibold">
+              <span className="truncate">{roleLabel}</span>
+            </span>
+            {email && <p className="mt-1 truncate text-small text-muted" title={email}>{email}</p>}
           </div>
-          {role !== "demo" && (
-            <a
-              href="/cuenta/contrasena"
-              className="inline-flex min-h-11 items-center text-xs text-slate-600 hover:text-slate-800 lg:mt-2 lg:min-h-0"
-            >
-              Cambiar contraseña
-            </a>
-          )}
-          {role !== "demo" && (
-            <form action={signOut} className="lg:mt-3">
-              <button
-                type="submit"
-                className="inline-flex min-h-11 items-center text-xs text-slate-500 hover:text-slate-700"
-              >
-                Cerrar sesión
-              </button>
-            </form>
-          )}
+          <ThemeToggle className="w-full justify-start px-3" />
+          {accountItems}
+          <Claim className="block px-3 pt-2 text-caption" />
         </div>
-      </div>
-    </aside>
+      }
+      mobileActions={
+        <>
+          <ThemeToggle compact />
+          <Popover
+            title="Cuenta"
+            buttonLabel="Cuenta"
+            onOpenChange={setMenuOpen}
+            buttonClassName="btn-ghost btn-icon"
+            button={
+              <span
+                aria-hidden
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-soft text-caption font-bold text-heading ring-1 ring-brand-200/70"
+              >
+                {initials(roleLabel)}
+              </span>
+            }
+          >
+            <div className="px-3 pb-2">
+              <p className="text-ui font-semibold text-ink">{roleLabel}</p>
+              {email && <p className="truncate text-small text-muted">{email}</p>}
+            </div>
+            {accountItems && <div className="border-t border-line pt-1">{accountItems}</div>}
+          </Popover>
+        </>
+      }
+    />
   );
+}
+
+function initials(label: string) {
+  const words = label.split(/\s+/).filter(Boolean);
+  const letters = words.length > 1 ? words[0][0] + words[1][0] : label.slice(0, 2);
+  return letters.toUpperCase();
 }

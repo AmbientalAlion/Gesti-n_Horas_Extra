@@ -2,17 +2,287 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ==========================================================================
+   Tokens de diseño ALIÓN
+   --c-*  : colores como canales RGB («r g b») para que Tailwind pueda usar
+            alfa: rgb(var(--c-surface) / 0.8). Ver tailwind.config.ts.
+   --shadow-*, --radius-*, --dur-*, --ease-*, --dist-* : forma y movimiento.
+   ========================================================================== */
 :root {
-  --background: #ebf7f9; /* Azul ALIÓN 7% */
-  --foreground: #003865; /* Azul Oscuro ALIÓN */
+  color-scheme: light;
+
+  /* Superficies */
+  --c-bg: 235 247 249; /* Azul ALIÓN 7% (fondo de página) */
+  --c-surface: 255 255 255; /* tarjetas */
+  --c-surface-2: 246 250 251; /* cabeceras de tabla, paneles internos, hover */
+  --c-surface-3: 235 242 245; /* seleccionado, pistas de barras, grupos */
+  /* Texto */
+  --c-ink: 15 43 70; /* cuerpo 14,4:1 */
+  --c-ink-2: 61 81 102; /* secundario 8,2:1 */
+  --c-muted: 91 107 125; /* pistas 5,5:1 sobre blanco, 5,0:1 sobre fondo */
+  --c-heading: 0 56 101; /* Azul Oscuro ALIÓN */
+  /* Líneas */
+  --c-line: 221 230 236; /* divisores */
+  --c-line-strong: 123 141 160; /* borde de control 3,4:1 */
+  /* Acción */
+  --c-primary: 0 122 150; /* blanco encima 4,97:1 */
+  --c-primary-hover: 0 110 135;
+  --c-primary-active: 0 95 120;
+  --c-primary-soft: 235 247 249;
+  --c-on-primary: 255 255 255;
+  --c-link: 0 110 135; /* 5,9:1 */
+  --c-link-hover: 0 56 101;
+  --c-focus: 0 122 150; /* anillo 4,5:1 sobre fondo */
+
+  /* Estados: fg = texto AA, solid = relleno/iconos, soft = fondo, border */
+  --c-ok-fg: 30 122 60;
+  --c-ok-solid: 22 163 74;
+  --c-ok-soft: 236 253 243;
+  --c-ok-border: 167 227 188;
+  --c-risk-fg: 166 66 0; /* naranja ALIÓN legible como texto */
+  --c-risk-solid: 255 132 0; /* Naranja ALIÓN: solo relleno */
+  --c-risk-soft: 255 241 224;
+  --c-risk-border: 255 201 143;
+  --c-over-fg: 185 28 28;
+  --c-over-solid: 220 38 38;
+  --c-over-soft: 254 242 242;
+  --c-over-border: 245 181 181;
+  --c-pending-fg: 122 0 144; /* Violeta ALIÓN oscurecido */
+  --c-pending-solid: 145 0 170; /* Violeta ALIÓN */
+  --c-pending-soft: 247 232 250;
+  --c-pending-border: 226 184 234;
+  --c-info-fg: 72 108 129; /* Bold sky ALIÓN */
+  --c-info-solid: 72 108 129;
+  --c-info-soft: 238 243 246;
+  --c-info-border: 197 211 220;
+
+  /* Gráficos */
+  --c-chart-grid: 226 232 240;
+  --c-chart-axis: 123 141 160;
+  --c-chart-label: 71 85 105;
+  --c-chart-label-strong: 30 41 59;
+  --c-chart-meta: 100 116 139;
+  --c-chart-limit: 0 56 101;
+  --c-chart-track: 230 238 242;
+  --c-chart-1: 0 152 186;
+  --c-chart-2: 0 56 101;
+  /* Mapa de calor: 0 <½ meta · 1 ½–¾ · 2 ¾–meta · 3 sobre la meta · 4 ≥1,25× */
+  --c-heat-0: 235 247 249;
+  --c-heat-1: 199 232 240;
+  --c-heat-2: 143 208 226;
+  --c-heat-3: 255 194 133;
+  --c-heat-4: 255 154 51;
+  --c-heat-ink-cool: 0 56 101;
+  --c-heat-ink-warm: 59 29 0;
+
+  /* Elevación (tinte del Azul Oscuro) */
+  --shadow-1: 0 1px 2px rgb(0 56 101 / 0.06), 0 1px 1px rgb(0 56 101 / 0.04);
+  --shadow-2: 0 6px 16px -4px rgb(0 56 101 / 0.12), 0 2px 4px -2px rgb(0 56 101 / 0.06);
+  --shadow-3: 0 24px 48px -12px rgb(0 56 101 / 0.28);
+
+  /* Radios */
+  --radius-chip: 6px;
+  --radius-control: 10px;
+  --radius-card: 14px;
+  --radius-hero: 20px;
+
+  /* Movimiento */
+  --dur-instant: 100ms; /* pulsar */
+  --dur-fast: 160ms; /* hover, foco, salidas cortas */
+  --dur-enter: 220ms; /* entradas de bloques */
+  --dur-base: 240ms; /* desplegables, pestañas, avisos */
+  --dur-slow: 320ms; /* panel, página, acordeón */
+  --dur-grow: 450ms; /* barras */
+  --dur-chart: 700ms; /* líneas y dona */
+  --dur-count: 600ms; /* contadores */
+  --dur-fade: 150ms; /* fundido del modo reducido */
+  --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ease-move: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dist-sm: 4px;
+  --dist-md: 8px;
+  --dist-lg: 24px;
+  --scale-from: 0.96;
+  --stagger: 30ms; /* máx. 150ms en total */
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: "Mulish", "Muli", Arial, sans-serif;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
+/* El tema oscuro solo en pantalla: lo impreso siempre sale claro. */
+@media screen {
+  .dark {
+    color-scheme: dark;
+
+    --c-bg: 11 21 36;
+    --c-surface: 16 27 45;
+    --c-surface-2: 22 36 58;
+    --c-surface-3: 28 45 71;
+    --c-ink: 230 237 245;
+    --c-ink-2: 185 198 214;
+    --c-muted: 159 176 195;
+    --c-heading: 145 210 225; /* Azul ALIÓN 40% */
+    --c-line: 34 50 74;
+    --c-line-strong: 90 111 136;
+    --c-primary: 88 188 210; /* Azul ALIÓN 60% */
+    --c-primary-hover: 145 210 225;
+    --c-primary-active: 181 226 236;
+    --c-primary-soft: 19 48 74;
+    --c-on-primary: 11 21 36;
+    --c-link: 88 188 210;
+    --c-link-hover: 145 210 225;
+    --c-focus: 88 188 210;
+
+    --c-ok-fg: 74 222 128;
+    --c-ok-solid: 34 197 94;
+    --c-ok-soft: 15 43 28;
+    --c-ok-border: 30 91 58;
+    --c-risk-fg: 255 154 61;
+    --c-risk-solid: 255 132 0;
+    --c-risk-soft: 46 29 10;
+    --c-risk-border: 107 60 10;
+    --c-over-fg: 248 113 113;
+    --c-over-solid: 239 68 68;
+    --c-over-soft: 44 20 20;
+    --c-over-border: 95 32 32;
+    --c-pending-fg: 213 140 230;
+    --c-pending-solid: 192 77 216;
+    --c-pending-soft: 42 23 51;
+    --c-pending-border: 92 45 107;
+    --c-info-fg: 169 189 204;
+    --c-info-solid: 127 152 172;
+    --c-info-soft: 22 36 58;
+    --c-info-border: 46 69 96;
+
+    --c-chart-grid: 34 50 74;
+    --c-chart-axis: 90 111 136;
+    --c-chart-label: 163 176 194;
+    --c-chart-label-strong: 226 232 240;
+    --c-chart-meta: 148 163 184;
+    --c-chart-limit: 145 210 225;
+    --c-chart-track: 28 45 71;
+    --c-chart-1: 88 188 210;
+    --c-chart-2: 145 210 225;
+    --c-heat-0: 16 35 58;
+    --c-heat-1: 14 59 87;
+    --c-heat-2: 11 95 120;
+    --c-heat-3: 92 51 4;
+    --c-heat-4: 138 74 0;
+    --c-heat-ink-cool: 226 232 240;
+    --c-heat-ink-warm: 255 231 204;
+
+    --shadow-1: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 1px 2px rgb(0 0 0 / 0.5);
+    --shadow-2: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 8px 24px -6px rgb(0 0 0 / 0.55);
+    --shadow-3: 0 24px 64px -12px rgb(0 0 0 / 0.7);
+  }
+}
+
+/* ==========================================================================
+   Movimiento reducido: reducir, no eliminar. Se quitan desplazamientos,
+   escalas y retrasos; se conservan fundidos cortos para que se note el cambio.
+   Todo JS (Element.animate, rAF, startViewTransition) consulta además
+   useReducedMotion() / prefersReducedMotion().
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dist-sm: 0px;
+    --dist-md: 0px;
+    --dist-lg: 0px;
+    --scale-from: 1;
+    --stagger: 0ms;
+    --dur-enter: var(--dur-fade);
+    --dur-base: var(--dur-fade);
+    --dur-slow: var(--dur-fade);
+    --dur-grow: 0ms;
+    --dur-chart: 0ms;
+    --dur-count: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Bucles: quietos (los spinner siguen, más lentos, como señal de espera). */
+  .animate-shimmer,
+  .animate-pulse-soft,
+  .sk {
+    animation: none !important;
+  }
+  .animate-spin {
+    animation-duration: 1.5s !important;
+  }
+  /* Barras y trazos aparecen sin crecer. */
+  .animate-grow-x,
+  .animate-grow-y,
+  .animate-draw-line,
+  .animate-shake,
+  .animate-fig-in {
+    animation: none !important;
+  }
+  ::view-transition-old(*) {
+    animation: vt-fade-out var(--dur-fade) linear both !important;
+  }
+  ::view-transition-new(*) {
+    animation: vt-fade-in var(--dur-fade) linear both !important;
+  }
+  ::view-transition-group(*) {
+    animation-duration: 0ms !important;
+  }
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+@layer base {
+  html {
+    font-family: theme("fontFamily.sans");
+    font-optical-sizing: auto;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+    scrollbar-gutter: stable;
+    scroll-padding-top: 72px;
+    scroll-padding-bottom: 80px;
+  }
+  body {
+    background-color: rgb(var(--c-bg));
+    color: rgb(var(--c-ink));
+    line-height: 1.5;
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  ::selection {
+    background-color: rgb(var(--c-primary) / 0.22);
+  }
+  /* Foco visible común: 2px sólido, ≥3:1 en ambos temas. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--c-focus));
+    outline-offset: 2px;
+  }
+  input,
+  select,
+  textarea {
+    accent-color: rgb(var(--c-primary));
+  }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    background-color: rgb(var(--c-surface));
+    color: rgb(var(--c-ink));
+  }
+  ::placeholder {
+    color: rgb(var(--c-muted));
+    opacity: 1;
+  }
+  /* Cifras siempre alineadas. */
+  .tabular-nums,
+  table {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 /* En teléfono los campos van a 16px: por debajo de eso Safari hace zoom
@@ -26,196 +296,322 @@ body {
   }
 }
 
-/* ---------- Modo oscuro ---------- */
-.dark {
-  --background: #0b1220;
-  --foreground: #e2e8f0;
-}
-.dark .card {
-  background-color: #131c2e;
-  border-color: #24314a;
-}
-.dark .btn-secondary {
-  background-color: #131c2e;
-  border-color: #334155;
-  color: #e2e8f0;
-}
-.dark .bg-white {
-  background-color: #131c2e !important;
-}
-.dark .bg-slate-50 {
-  background-color: #0f1930 !important;
-}
-.dark .bg-slate-100 {
-  background-color: #1e293b !important;
-}
-.dark .bg-brand-tint {
-  background-color: #10233a !important;
-}
-/* Blancos translúcidos (chips de la leyenda, tarjetas sobre azul 7%). */
-.dark .bg-white\/70,
-.dark .bg-white\/80 {
-  background-color: rgba(19, 28, 46, 0.9) !important;
-}
-.dark .hover\:bg-white:hover {
-  background-color: #1c2740 !important;
-}
-.dark .text-slate-900 {
-  color: #e2e8f0 !important;
-}
-.dark .text-slate-800 {
-  color: #dbe3ee !important;
-}
-.dark .text-slate-700 {
-  color: #cbd5e1 !important;
-}
-.dark .text-slate-600 {
-  color: #b6c2d4 !important;
-}
-.dark .text-slate-500 {
-  color: #a3b0c2 !important;
-}
-.dark .text-slate-400 {
-  color: #9aa8bd !important;
-}
-.dark .text-brand-dark {
-  color: #7fd0e3 !important;
-}
-.dark .border-slate-200 {
-  border-color: #24314a !important;
-}
-.dark .border-slate-100 {
-  border-color: #1c2740 !important;
-}
-.dark .border-slate-300 {
-  border-color: #334155 !important;
-}
-.dark .divide-slate-100 > * + *,
-.dark .divide-slate-200 > * + * {
-  border-color: #24314a !important;
-}
-.dark input,
-.dark select,
-.dark textarea {
-  background-color: #0f1930;
-  color: #e2e8f0;
-  border-color: #334155;
-}
+/* ==========================================================================
+   Componentes base
+   ========================================================================== */
+@layer components {
+  /* ---- Tarjetas ---- */
+  .card {
+    @apply rounded-card border border-line bg-surface p-4 shadow-1 sm:p-5;
+  }
+  /* Tarjeta clicable: se eleva al pasar y responde al pulsar. */
+  .card-interactive {
+    transition-property: box-shadow, transform, border-color, background-color;
+    transition-duration: var(--dur-fast);
+    transition-timing-function: var(--ease-enter);
+  }
+  @media (hover: hover) {
+    .card-interactive:hover {
+      @apply border-primary/40 shadow-2;
+      transform: translateY(-2px);
+    }
+  }
+  .card-interactive:active {
+    transform: translateY(0) scale(0.99);
+    transition-duration: var(--dur-instant);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card-interactive:hover,
+    .card-interactive:active {
+      transform: none !important;
+    }
+  }
+  /* Panel interno dentro de una tarjeta: superficie, sin borde. */
+  .panel {
+    @apply rounded-control bg-surface-2 p-4;
+  }
 
-/* Estados interactivos en oscuro: sin esto, al pasar el mouse el fondo se
-   aclaraba y el texto quedaba ilegible. */
-.dark .hover\:bg-brand-tint:hover,
-.dark .hover\:bg-brand-tint\/60:hover,
-.dark .hover\:bg-brand\/10:hover {
-  background-color: #16304d !important;
-}
-.dark .hover\:bg-slate-50:hover,
-.dark .hover\:bg-slate-100:hover {
-  background-color: #1c2740 !important;
-}
-.dark .hover\:bg-brand:hover {
-  background-color: #0098ba !important;
-}
-.dark .hover\:text-brand-dark:hover {
-  color: #a5e3f2 !important;
-}
-.dark .hover\:text-slate-700:hover {
-  color: #e2e8f0 !important;
-}
+  /* ---- Botones ---- */
+  .btn {
+    @apply inline-flex min-h-11 select-none items-center justify-center gap-2 whitespace-nowrap rounded-control border border-transparent px-4 py-2 text-sm font-semibold sm:min-h-10;
+    transition-property: background-color, border-color, color, box-shadow, transform, opacity;
+    transition-duration: var(--dur-fast);
+    transition-timing-function: var(--ease-enter);
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(1px) scale(0.98);
+    transition-duration: var(--dur-instant);
+  }
+  .btn:disabled:not([aria-busy="true"]),
+  .btn[aria-disabled="true"] {
+    @apply cursor-not-allowed border-line bg-surface-3 text-muted shadow-none;
+  }
+  .btn[aria-busy="true"] {
+    cursor: progress;
+  }
+  .btn-primary {
+    @apply btn bg-primary text-on-primary shadow-1 hover:bg-primary-hover active:bg-primary-active;
+  }
+  .btn-secondary {
+    @apply btn border-line-strong bg-surface text-ink hover:border-primary/60 hover:bg-primary-soft hover:text-heading;
+  }
+  .btn-ghost {
+    @apply btn text-link hover:bg-primary-soft hover:text-link-hover;
+  }
+  .btn-danger {
+    @apply btn bg-[#B91C1C] text-white hover:bg-[#991B1B];
+  }
+  .btn-sm {
+    @apply min-h-9 rounded-chip px-3 py-1 text-small sm:min-h-9;
+  }
+  .btn-icon {
+    @apply h-11 w-11 shrink-0 p-0 sm:h-10 sm:w-10;
+  }
 
-/* Texto dentro de los SVG de las gráficas. */
-.dark .fill-brand-dark {
-  fill: #7fd0e3 !important;
-}
-.dark .fill-slate-500 {
-  fill: #a3b0c2 !important;
-}
-.dark .fill-slate-400 {
-  fill: #9aa8bd !important;
-}
+  /* ---- Campos ---- */
+  .field {
+    @apply block min-h-11 w-full rounded-control border border-line-strong bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted sm:min-h-10;
+    transition-property: border-color, box-shadow, background-color;
+    transition-duration: var(--dur-fast);
+    transition-timing-function: var(--ease-enter);
+  }
+  @media (hover: hover) {
+    .field:hover:not(:disabled):not(:focus) {
+      border-color: rgb(var(--c-primary) / 0.7);
+    }
+  }
+  /* Foco: borde primario + halo; el borde da por sí solo ≥3:1. */
+  .field:focus,
+  .field:focus-visible {
+    outline: none;
+    border-color: rgb(var(--c-primary));
+    box-shadow: 0 0 0 1px rgb(var(--c-primary)), 0 0 0 4px rgb(var(--c-focus) / 0.25);
+  }
+  .field[aria-invalid="true"] {
+    border-color: rgb(var(--c-over-solid));
+  }
+  .field[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 1px rgb(var(--c-over-solid)), 0 0 0 4px rgb(var(--c-over-solid) / 0.2);
+  }
+  .field:disabled {
+    @apply cursor-not-allowed bg-surface-3 text-muted;
+  }
+  select.field {
+    appearance: none;
+    padding-right: 2.25rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235B6B7D' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    background-size: 1rem;
+  }
+  .dark select.field {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239FB0C3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+  .label-field {
+    @apply mb-1.5 block text-small font-medium text-ink-2;
+  }
 
-/* Avisos (ámbar / rojo / verde) en oscuro. */
-.dark .bg-amber-50 {
-  background-color: #2a2009 !important;
-}
-.dark .bg-amber-100 {
-  background-color: #3a2c0c !important;
-}
-.dark .text-amber-800,
-.dark .text-amber-700,
-.dark .text-amber-600 {
-  color: #fcd34d !important;
-}
-.dark .border-amber-200 {
-  border-color: #5a4410 !important;
-}
-.dark .bg-red-50 {
-  background-color: #2c1414 !important;
-}
-.dark .bg-red-100 {
-  background-color: #3a1a1a !important;
-}
-.dark .text-red-800,
-.dark .text-red-700 {
-  color: #fca5a5 !important;
-}
-.dark .border-red-200 {
-  border-color: #5f2020 !important;
-}
-.dark .bg-green-50 {
-  background-color: #0f2b1c !important;
-}
-.dark .bg-green-100 {
-  background-color: #0f2b1c !important;
-}
-.dark .text-green-800,
-.dark .text-green-700 {
-  color: #86efac !important;
-}
-.dark .border-green-200 {
-  border-color: #1e5b3a !important;
-}
-.dark .bg-violet-50 {
-  background-color: #1f1733 !important;
-}
-.dark .bg-violet-100 {
-  background-color: #2a1f45 !important;
-}
-.dark .text-violet-800,
-.dark .text-violet-700 {
-  color: #c4b5fd !important;
-}
-.dark .border-violet-200,
-.dark .border-violet-300 {
-  border-color: #4c3a80 !important;
-}
-/* `.dark .card` gana por especificidad a `.bg-red-50`: hay que reponerlo. */
-.dark .card.bg-red-50 {
-  background-color: #2c1414 !important;
-  border-color: #5f2020 !important;
-}
-.dark .card.bg-amber-50 {
-  background-color: #2a2009 !important;
-  border-color: #5a4410 !important;
-}
-.dark .focus\:ring-brand\/20:focus {
-  --tw-ring-color: rgba(0, 152, 186, 0.55) !important;
-}
+  /* ---- Chips ---- */
+  .chip {
+    @apply inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-caption text-ink-2;
+  }
+  .chip-brand {
+    @apply chip border-brand-200/70 bg-primary-soft text-heading;
+  }
+  .chip-ok {
+    @apply chip border-ok-border bg-ok-soft text-ok;
+  }
+  .chip-risk {
+    @apply chip border-risk-border bg-risk-soft text-risk;
+  }
+  .chip-over {
+    @apply chip border-over-border bg-over-soft text-over;
+  }
+  .chip-pending {
+    @apply chip border-pending-border bg-pending-soft text-pending;
+  }
+  .chip-info {
+    @apply chip border-info-border bg-info-soft text-info;
+  }
+  /* Chip clicable (filtros): 36px de alto y respuesta al tacto. */
+  .chip-interactive {
+    @apply min-h-9 cursor-pointer px-3 transition-colors duration-fast hover:border-primary/50 hover:bg-primary-soft active:bg-primary-soft;
+  }
 
-/* Quien pide menos movimiento en su sistema no ve animaciones. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  /* ---- Tablas ---- */
+  .th {
+    @apply whitespace-nowrap px-4 py-3 text-left text-small font-semibold text-ink-2;
+  }
+  .th-num {
+    @apply whitespace-nowrap px-4 py-3 text-right text-small font-semibold text-ink-2;
+  }
+  /* Contenedor desplazable con sombras que indican que hay más columnas. */
+  .table-scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    background:
+      linear-gradient(to right, rgb(var(--c-surface)) 30%, rgb(var(--c-surface) / 0)) left center / 40px 100% no-repeat local,
+      linear-gradient(to left, rgb(var(--c-surface)) 30%, rgb(var(--c-surface) / 0)) right center / 40px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgb(0 56 101 / 0.18), transparent) left center / 12px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgb(0 56 101 / 0.18), transparent) right center / 12px 100% no-repeat scroll;
+  }
+
+  /* ---- Enlaces ---- */
+  .link {
+    @apply font-medium text-link underline decoration-link/40 underline-offset-2 hover:text-link-hover hover:decoration-current;
+    transition-property: color, text-decoration-color;
+    transition-duration: var(--dur-fast);
+  }
+
+  /* ---- Esqueleto ---- */
+  .sk {
+    @apply rounded-control;
+    background-color: rgb(var(--c-surface-3));
+    background-image: linear-gradient(
+      90deg,
+      rgb(var(--c-surface-3)) 0%,
+      rgb(var(--c-surface-2)) 40%,
+      rgb(var(--c-surface-3)) 80%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+
+  /* ---- Entrada escalonada ----
+     .reveal          : un bloque entra con fade-up (220ms).
+     style={{"--i": n}}: su índice; retraso = min(n × 30ms, 150ms).
+     .reveal-stagger  : cada hijo directo entra escalonado (1.º a 6.º; el
+                        resto sin retraso). Nunca retrasa más de 150ms. */
+  .reveal,
+  .reveal-stagger > * {
+    animation: fade-up var(--dur-enter) var(--ease-enter) backwards;
+    animation-delay: min(calc(var(--i, 0) * var(--stagger)), 150ms);
+  }
+  .reveal-stagger > :nth-child(2) { --i: 1; }
+  .reveal-stagger > :nth-child(3) { --i: 2; }
+  .reveal-stagger > :nth-child(4) { --i: 3; }
+  .reveal-stagger > :nth-child(5) { --i: 4; }
+  .reveal-stagger > :nth-child(n + 6) { --i: 5; }
+  /* <Reveal> (ui/Reveal.tsx): solo oculta lo que está bajo el pliegue y
+     con JS activo; se muestra al entrar en pantalla. */
+  [data-reveal="pending"] {
+    opacity: 0;
+    transform: translateY(var(--dist-md));
+  }
+  [data-reveal="in"] {
+    animation: fade-up var(--dur-slow) var(--ease-enter) backwards;
+  }
+
+  /* Pistas visibles solo al pasar el ratón (y siempre en táctil). */
+  .hover-reveal {
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease-enter), transform var(--dur-fast) var(--ease-enter);
+  }
+  .group:hover .hover-reveal,
+  .group:focus-visible .hover-reveal,
+  .hover-reveal:focus-visible {
+    opacity: 1;
+  }
+  @media (hover: none) {
+    .hover-reveal {
+      opacity: 1;
+    }
+  }
+
+  /* Imprimir colores de fondo (barras, celdas, insignias) aunque el
+     navegador tenga desactivados los «gráficos de fondo». */
+  .print-exact {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Logo oscuro como fondo: solo se descarga cuando aplica el tema. */
+  .dark .brand-logo-dark {
+    background-image: url("/brand/logo-alion-dark-480.png");
   }
 }
 
+/* Cambio de tema sin View Transitions: todo cambia a la vez. */
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
+}
+
+/* ==========================================================================
+   View Transitions (mejora progresiva)
+   - Navegación: fundido + desplazamiento corto del root.
+   - html.vt-theme: cambio de tema con revelado circular (lo anima
+     ThemeToggle con Element.animate sobre ::view-transition-new(root)).
+   - Nombres reservados para otros paquetes: page, app-nav.
+   ========================================================================== */
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes vt-out {
+  to {
+    opacity: 0;
+    transform: translateY(calc(var(--dist-sm) * -1));
+  }
+}
+@keyframes vt-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--dist-md));
+  }
+}
+::view-transition-old(root),
+::view-transition-old(page) {
+  animation: vt-out var(--dur-fast) var(--ease-exit) both;
+}
+::view-transition-new(root),
+::view-transition-new(page) {
+  animation: vt-in var(--dur-base) var(--ease-enter) both;
+}
+::view-transition-group(app-nav) {
+  animation: none;
+}
+html.vt-theme::view-transition-old(root),
+html.vt-theme::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+html.vt-theme::view-transition-old(*),
+html.vt-theme::view-transition-new(*),
+html.vt-theme::view-transition-group(*) {
+  animation-duration: 0ms;
+}
+
+/* ==========================================================================
+   Impresión
+   ========================================================================== */
+@page {
+  size: A4;
+  margin: 12mm 12mm 14mm;
+}
 @media print {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  html {
+    color-scheme: light;
+  }
   body {
     background: #fff;
+  }
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
   }
   .card {
     box-shadow: none !important;
@@ -224,30 +620,10 @@ body {
   main {
     width: 100% !important;
   }
-}
-
-@layer components {
-  .card {
-    @apply rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5;
+  thead {
+    display: table-header-group;
   }
-  .btn-primary {
-    @apply inline-flex min-h-11 items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-dark disabled:opacity-50;
-  }
-  .btn-secondary {
-    @apply inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50;
-  }
-  /* Encabezado de tabla legible: en español completo, sin versalitas apretadas. */
-  .th {
-    @apply whitespace-nowrap px-4 py-3 text-left text-[13px] font-semibold text-slate-600;
-  }
-  .th-num {
-    @apply whitespace-nowrap px-4 py-3 text-right text-[13px] font-semibold text-slate-600;
-  }
-  /* Campo de formulario estándar (altura cómoda y foco visible). */
-  .field {
-    @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-500 focus:border-brand focus:ring-2 focus:ring-brand/30;
-  }
-  .label-field {
-    @apply mb-1.5 block text-[13px] font-medium text-slate-600;
+  tr {
+    break-inside: avoid;
   }
 }

@@ -1,37 +1,24 @@
 import { UploadForm } from "@/components/UploadForm";
-import { RULES } from "@/lib/overtime";
+import { PageHeader } from "@/components/PageHeader";
 
 export const dynamic = "force-dynamic";
 
-export default function DemoUpload() {
+export default function DemoUpload({ searchParams }: { searchParams: { rol?: string } }) {
+  const rol = ["rrhh", "director", "jefe"].includes(searchParams.rol ?? "") ? searchParams.rol : "rrhh";
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-brand-dark">Módulo de carga</h1>
-        <p className="text-sm text-slate-500">
-          Sube un CSV biométrico (corte parcial o final). En el demo solo se
-          <strong> valida</strong> el archivo y se detectan errores; no se
-          guardan datos.
-        </p>
-      </header>
-
-      <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-        <p className="font-medium text-brand-dark">Columnas esperadas</p>
-        <p className="mt-1">
-          <code>ID</code>, <code>Rol</code>, <code>Área</code>,{" "}
-          <code>Horas Totales</code> y (opcional) <code>Turno Máximo</code> para
-          detectar horas huérfanas (turnos &gt; {RULES.ORPHAN_SHIFT_HOURS}h).
-        </p>
-        <a
-          href="/ejemplo_biometrico.csv"
-          download
-          className="mt-2 inline-block font-medium text-brand hover:text-brand-dark"
-        >
-          ↓ Descargar CSV de ejemplo
-        </a>
-      </div>
-
-      <UploadForm demo />
+      <PageHeader
+        eyebrow="Recursos Humanos"
+        title="Cargar archivo"
+        subtitle="Cargue el archivo de novedades o el semanal del biométrico y revise la vista previa antes de guardar."
+      >
+        <span className="chip-brand">Demostración: el archivo se valida, pero no se guarda</span>
+      </PageHeader>
+      <UploadForm
+        demo
+        dashboardHref={`/demo/dashboard?rol=${rol}`}
+        reviewHref={`/demo/revisiones?rol=${rol}`}
+      />
     </div>
   );
 }

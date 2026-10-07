@@ -1,33 +1,23 @@
 import { UploadForm } from "@/components/UploadForm";
 import { PageHeader } from "@/components/PageHeader";
-import { RULES } from "@/lib/overtime";
+import { RecentUploads } from "@/components/rrhh/RecentUploads";
+import { getRecentUploads } from "@/components/rrhh/history";
 import { requireRrhh } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
 export default async function UploadPage() {
   await requireRrhh();
+  const recent = await getRecentUploads(5);
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Cargar horas del biométrico"
-        subtitle="Cargue el archivo de novedades o el archivo semanal del biométrico. Las horas se ubican en el mes de cada día; si vuelve a cargar el mismo periodo, se reemplazan los datos anteriores, salvo los registros ya revisados."
+        eyebrow="Recursos Humanos"
+        title="Cargar archivo"
+        subtitle="Cargue el archivo de novedades o el semanal del biométrico. Primero verá una vista previa; si vuelve a cargar el mismo periodo, se reemplazan los datos anteriores, salvo los registros ya revisados."
       />
-
-      <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-        <p className="font-medium text-slate-700">Columnas esperadas</p>
-        <p className="mt-1">
-          <code>ID</code>, <code>Rol</code>, <code>Área</code>,{" "}
-          <code>Horas Totales</code> y (opcional) <code>Turno Máximo</code> para
-          detectar horas huérfanas (turnos de más de {RULES.ORPHAN_SHIFT_HOURS}h).
-        </p>
-        <p className="mt-2">
-          También se acepta el archivo de novedades de nómina, con una fila por
-          recargo; el sistema lo reconoce solo.
-        </p>
-      </div>
-
       <UploadForm />
+      <RecentUploads entries={recent} />
     </div>
   );
 }

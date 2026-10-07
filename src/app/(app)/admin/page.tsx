@@ -89,24 +89,24 @@ export default async function AdminPage() {
       />
 
       {!rolesReady && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="rounded-lg border border-risk-border bg-risk-soft px-4 py-3 text-sm text-risk">
           Falta aplicar la migración de roles en la base de datos.
         </div>
       )}
 
       {/* Crear usuario */}
       <section className="card space-y-3" aria-labelledby="nuevo-usuario">
-        <h2 id="nuevo-usuario" className="text-lg font-semibold text-brand-dark">
+        <h2 id="nuevo-usuario" className="text-lg font-semibold text-heading">
           Nuevo usuario
         </h2>
         {!adminApi && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <div className="rounded-lg border border-risk-border bg-risk-soft px-3 py-2 text-sm text-risk">
             Para crear cuentas desde aquí falta agregar la llave de servicio de Supabase en
             Vercel (variable <code>SUPABASE_SERVICE_ROLE_KEY</code>). Mientras tanto puede crear
             roles y asignarlos a los usuarios que ya existen.
           </div>
         )}
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-ink-2">
           Se genera una contraseña temporal que usted entrega a la persona; al entrar por
           primera vez deberá crear la suya.
         </p>
@@ -115,22 +115,22 @@ export default async function AdminPage() {
 
       {/* Usuarios */}
       <section aria-labelledby="usuarios">
-        <h2 id="usuarios" className="mb-3 text-lg font-semibold text-brand-dark">
+        <h2 id="usuarios" className="mb-3 text-lg font-semibold text-heading">
           Usuarios ({profiles.length})
         </h2>
         <div className="card overflow-x-auto p-0">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50">
+          <table className="min-w-full divide-y divide-line text-sm">
+            <thead className="bg-surface-2">
               <tr>
                 <th scope="col" className="th">Usuario</th>
                 <th scope="col" className="th">Rol</th>
                 <th scope="col" className="th">Contraseña</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-line">
               {profiles.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-4 py-8 text-center text-sm text-slate-600">
+                  <td colSpan={3} className="px-4 py-8 text-center text-sm text-ink-2">
                     Todavía no hay usuarios.
                   </td>
                 </tr>
@@ -138,10 +138,10 @@ export default async function AdminPage() {
               {profiles.map((p) => (
                 <tr key={p.id} className="align-top">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-slate-900">{p.full_name ?? p.email}</div>
-                    <div className="text-[13px] text-slate-600">{p.email}</div>
+                    <div className="font-medium text-ink">{p.full_name ?? p.email}</div>
+                    <div className="text-[13px] text-ink-2">{p.email}</div>
                     {p.must_change_password && (
-                      <div className="text-[12px] text-amber-700">Pendiente de crear su contraseña</div>
+                      <div className="text-[12px] text-risk">Pendiente de crear su contraseña</div>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -153,12 +153,12 @@ export default async function AdminPage() {
                         label={p.full_name ?? p.email}
                       />
                     ) : (
-                      <span className="text-slate-600">{p.role ?? "Sin rol"}</span>
+                      <span className="text-ink-2">{p.role ?? "Sin rol"}</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
                     {p.id === profile.id ? (
-                      <a href="/cuenta/contrasena" className="text-sm text-brand-dark underline">
+                      <a href="/cuenta/contrasena" className="text-sm text-heading underline">
                         Cambiar la mía
                       </a>
                     ) : (
@@ -175,7 +175,7 @@ export default async function AdminPage() {
       {/* Roles */}
       {rolesReady && (
         <section aria-labelledby="roles" className="space-y-3">
-          <h2 id="roles" className="text-lg font-semibold text-brand-dark">
+          <h2 id="roles" className="text-lg font-semibold text-heading">
             Roles ({roles.length})
           </h2>
           <ul className="space-y-3">
@@ -200,18 +200,18 @@ export default async function AdminPage() {
         defaultOpen={false}
       >
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50">
+          <table className="min-w-full divide-y divide-line text-sm">
+            <thead className="bg-surface-2">
               <tr>
                 <th scope="col" className="th">Empleado</th>
                 <th scope="col" className="th">Área</th>
                 <th scope="col" className="th">Jefe asignado</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-line">
               {employees.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-4 py-8 text-center text-sm text-slate-600">
+                  <td colSpan={3} className="px-4 py-8 text-center text-sm text-ink-2">
                     Todavía no hay empleados. Cárguelos desde «Cargar archivo».
                   </td>
                 </tr>
@@ -219,10 +219,10 @@ export default async function AdminPage() {
               {employees.map((e) => (
                 <tr key={e.id}>
                   <td className="px-4 py-3">
-                    <div className="font-medium text-slate-900">{e.name ?? e.code}</div>
-                    <div className="text-[13px] text-slate-600">{e.code}</div>
+                    <div className="font-medium text-ink">{e.name ?? e.code}</div>
+                    <div className="text-[13px] text-ink-2">{e.code}</div>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{e.area ?? "—"}</td>
+                  <td className="px-4 py-3 text-ink-2">{e.area ?? "—"}</td>
                   <td className="px-4 py-3">
                     <form action={assignManager} className="flex items-center gap-2">
                       <input type="hidden" name="employeeId" value={e.id} />
@@ -256,16 +256,16 @@ export default async function AdminPage() {
       {!logRes.error && (
         <CollapsibleCard title="Últimos cambios de acceso" defaultOpen={false}>
           {(logRes.data ?? []).length === 0 ? (
-            <p className="text-sm text-slate-600">Sin cambios registrados.</p>
+            <p className="text-sm text-ink-2">Sin cambios registrados.</p>
           ) : (
-            <ul className="divide-y divide-slate-100 text-sm">
+            <ul className="divide-y divide-line text-sm">
               {(logRes.data ?? []).map((l, i) => (
                 <li key={i} className="flex flex-wrap gap-x-3 py-2">
-                  <span className="tabular-nums text-slate-500">
+                  <span className="tabular-nums text-muted">
                     {new Date(l.changed_at).toLocaleString("es-CO", { timeZone: "America/Bogota", dateStyle: "short", timeStyle: "short" })}
                   </span>
-                  <span className="font-medium text-slate-800">{FIELD_TEXT[l.field] ?? l.field}</span>
-                  <span className="text-slate-700">
+                  <span className="font-medium text-ink">{FIELD_TEXT[l.field] ?? l.field}</span>
+                  <span className="text-ink-2">
                     {l.user_id ? personName.get(l.user_id) ?? "usuario" : ""}
                     {l.field === "rol_acceso" && `: ${l.old_value ?? "sin rol"} → ${l.new_value ?? "sin rol"}`}
                     {l.field === "alta" && `: ${l.new_value}`}

@@ -1,20 +1,23 @@
 import { KpiCard } from "./KpiCard";
 import { AlertsCenter } from "./AlertsCenter";
-import { LegendStrip } from "./LegendStrip";
 import { DrawerProvider } from "./drawer/DrawerProvider";
-import { EmployeeLink } from "./drawer/EmployeeLink";
 import { FilterableEmployeeTable } from "./FilterableEmployeeTable";
 import { EmployeeSearch } from "./EmployeeSearch";
 import { CollapsibleCard } from "./CollapsibleCard";
-import { DonutChart } from "./charts/DonutChart";
 import { TrendChart } from "./charts/TrendChart";
 import { HBarChart } from "./charts/HBarChart";
 import { Heatmap } from "./charts/Heatmap";
-import { StatusBadge } from "./StatusBadge";
 import { DashboardFilters } from "./DashboardFilters";
-import { FigureCluster } from "./brand/Figures";
+import { MonthHero, type HeroNotice } from "./dashboard/MonthHero";
+import { DashboardNavProvider, DataRegion } from "./dashboard/DashboardNav";
+import { WeeklyView } from "./dashboard/WeeklyView";
 import { fmtH, monthlyTarget, RULES } from "@/lib/overtime";
-import { daysInMonth as monthDays, formatDayLong, monthLabel } from "@/lib/dates";
+import {
+  daysInMonth as monthDays,
+  formatDayLong,
+  monthLabel,
+  monthSegments,
+} from "@/lib/dates";
 import type { Role } from "@/lib/types";
 import type {
   DashboardCharts,
@@ -25,11 +28,13 @@ import type {
   PlantSummary,
 } from "@/lib/aggregate";
 
-const ROLE_FOCUS: Record<Role | "demo", { tag: string; focus: string }> = {
+type ViewRole = Role | "demo";
+
+const ROLE_FOCUS: Record<ViewRole, { tag: string; focus: string }> = {
   rrhh: {
     tag: "Recursos Humanos",
     focus:
-      "Toda la organización: quién va por encima de la meta del mes, quién superó 48h y qué registros hay que revisar.",
+      "Toda la organización: quién va por encima de la meta, quién superó 48h y qué registros hay que revisar.",
   },
   director: {
     tag: "Director",
@@ -42,9 +47,20 @@ const ROLE_FOCUS: Record<Role | "demo", { tag: string; focus: string }> = {
   },
   demo: {
     tag: "Demostración",
-    focus:
-      "Explore la herramienta cambiando de rol y filtrando por planta, dirección, área o jefe.",
+    focus: "Explore la herramienta cambiando de rol y filtrando por planta, dirección, área o jefe.",
   },
+};
+
+/**
+ * Qué gráficos ve cada rol y en qué orden. Los gráficos de grupo con menos
+ * de dos barras no se muestran (una sola barra no compara nada).
+ */
+type ChartKey = "trend" | "top" | "area" | "plant" | "direccion";
+const ROLE_CHARTS: Record<ViewRole, ChartKey[]> = {
+  rrhh: ["trend", "plant", "direccion", "area", "top"],
+  demo: ["trend", "plant", "direccion", "area", "top"],
+  director: ["trend", "top", "area", "direccion", "plant"],
+  jefe: ["top", "trend", "area"],
 };
 
 /** Datos del mes que se muestran en la cabecera y usa el panel lateral. */
@@ -54,15 +70,24 @@ function periodInfo(period: Period) {
   const cutoffLabel =
     cutoff > 0 ? formatDayLong({ y: period.year, m: period.month, d: cutoff }) : null;
   const month = monthLabel(period.year, period.month);
-  let main = month;
-  if (period.status === "futuro") main += " · el mes aún no empieza";
-  else if (!cutoffLabel) main += " · sin datos cargados";
-  else {
-    main += period.status === "cerrado" ? " · mes cerrado" : "";
-    main += ` · datos hasta el ${cutoffLabel} · meta a esa fecha ${fmtH(monthlyTarget(cutoff))}`;
-  }
+  const note =
+    period.status === "futuro"
+      ? "el mes aún no empieza"
+      : !cutoffLabel
+        ? "sin datos cargados"
+        : period.status === "cerrado"
+          ? "mes cerrado"
+          : undefined;
   return {
-    main,
+    hero: {
+      monthLabel: month,
+      note,
+      cutoffDay: cutoff,
+      cutoffLabel,
+      daysInMonth: days,
+      target: monthlyTarget(cutoff),
+      ticks: monthSegments(period.year, period.month).map((s) => s.end.d),
+    },
     drawer: {
       daysInMonth: days,
       cutoffDay: cutoff,
@@ -83,6 +108,54 @@ function groupSub(g: { count: number; red: number; yellow: number; perPerson: nu
   ]
     .filter(Boolean)
     .join(" · ");
+}
+
+/** Aviso de acción del encabezado, según el rol. */
+function heroNotice(
+  role: ViewRole,
+  statuses: EmployeeStatus[],
+  summary: PlantSummary,
+  reviewHref?: string
+): HeroNotice | null {
+  if (role === "rrhh" || role === "demo") {
+    if (summary.withErrors > 0)
+      return {
+        tone: "pending",
+        text: "Hay registros congelados esperando revisión: no suman al acumulado hasta resolverlos.",
+        action: reviewHref ? { label: "Revisar ahora", href: reviewHref } : undefined,
+      };
+    return null;
+  }
+  if (role === "director") {
+    if (summary.riskByProjection > 0)
+      return {
+        tone: "risk",
+        text: `A su ritmo, hay personas que cerrarían el mes por encima de ${RULES.MONTHLY_OVERTIME_LIMIT}h.`,
+        action: { label: "Ver alertas", href: "#alertas" },
+      };
+    if (summary.withErrors > 0)
+      return {
+        tone: "info",
+        text: "Recursos Humanos está revisando registros de su dirección; el estado de esas personas puede cambiar.",
+      };
+    return null;
+  }
+  // Jefe: la persona que más se pasa de la meta.
+  const top = statuses
+    .filter((s) => s.overTarget > 0)
+    .sort((a, b) => b.overTarget - a.overTarget)[0];
+  if (top)
+    return {
+      tone: top.level === "red" ? "over" : "risk",
+      text: `${top.name ?? top.code} es quien más se pasa de la meta: +${fmtH(top.overTarget)}.`,
+      action: { label: "Ver detalle", employeeId: top.id },
+    };
+  if (summary.withErrors > 0)
+    return {
+      tone: "info",
+      text: "Recursos Humanos está revisando registros de su equipo; el estado de esas personas puede cambiar.",
+    };
+  return null;
 }
 
 export function DashboardView({
@@ -106,7 +179,7 @@ export function DashboardView({
   scopeLabel: string;
   hrefBase: string;
   roleParam?: string;
-  role?: Role | "demo";
+  role?: ViewRole;
   toolbar?: React.ReactNode;
   filterOptions?: FilterOptions;
   filters?: Filters;
@@ -115,10 +188,10 @@ export function DashboardView({
 }) {
   const info = periodInfo(period);
   const noData = info.drawer.cutoffDay === 0;
-  // En riesgo, primero quien más se pasa de la meta; luego por proyección.
-  const atRisk = statuses
-    .filter((s) => s.level === "yellow")
-    .sort((a, b) => b.overTarget - a.overTarget || b.projectedMonthlyOvertime - a.projectedMonthlyOvertime);
+  const isRrhh = role === "rrhh" || role === "demo";
+  const reviewHref = isRrhh
+    ? `${hrefBase.replace(/\/empleado$/, "/revisiones")}${roleParam ? `?rol=${roleParam}` : ""}`
+    : undefined;
 
   // Los enlaces a la ficha arrastran los filtros vigentes para poder volver
   // al panel exactamente como estaba.
@@ -126,6 +199,101 @@ export function DashboardView({
     const qs = [query, roleParam ? `rol=${roleParam}` : ""].filter(Boolean).join("&");
     return `${hrefBase}/${id}${qs ? `?${qs}` : ""}`;
   };
+
+  const perPerson =
+    summary.totalEmployees > 0 ? summary.totalMonthlyOvertime / summary.totalEmployees : 0;
+
+  // ---- Gráficos ----
+  const chartTitle = (t: string, drill?: boolean) => (
+    <h3 className="mb-3 text-ui font-semibold text-heading">
+      {t}
+      {drill && <span className="font-normal text-muted"> · toque para ver detalle</span>}
+    </h3>
+  );
+  const groupChart = (
+    key: ChartKey,
+    title: string,
+    items: { label: string; overtime: number; count: number; red: number; yellow: number; perPerson: number }[],
+    drill: { param: string; clear: string[] }
+  ) =>
+    items.length >= 2
+      ? {
+          key,
+          node: (
+            <>
+              {chartTitle(title, true)}
+              <HBarChart
+                color="rgb(var(--c-chart-1))"
+                drill={drill}
+                items={items.map((g) => ({
+                  label: g.label,
+                  value: g.overtime,
+                  sublabel: groupSub(g),
+                }))}
+              />
+            </>
+          ),
+        }
+      : null;
+
+  const CHARTS: Record<ChartKey, { key: ChartKey; node: React.ReactNode } | null> = {
+    trend: {
+      key: "trend",
+      node: (
+        <>
+          <h3 className="text-ui font-semibold text-heading">Horas extra por tramo del mes</h3>
+          <p className="mb-3 text-caption font-normal text-muted">
+            Suma de la vista en cada tramo · los tramos parciales tienen menos días
+          </p>
+          <TrendChart
+            points={charts.trend
+              .filter((w) => !w.future)
+              .map((w) => ({ label: w.short, value: w.overtime }))}
+          />
+        </>
+      ),
+    },
+    top:
+      charts.topEmployees.length > 0
+        ? {
+            key: "top",
+            node: (
+              <>
+                {chartTitle(role === "jefe" ? "Mi equipo por horas extra" : "Top empleados por horas extra")}
+                <HBarChart
+                  items={charts.topEmployees.map((t) => ({
+                    label: t.name,
+                    value: t.overtime,
+                    level: t.level,
+                    sublabel: t.area,
+                    href: empLink(t.id),
+                    employeeId: t.id,
+                  }))}
+                />
+              </>
+            ),
+          }
+        : null,
+    area: groupChart(
+      "area",
+      "Horas extra por área",
+      charts.byArea.map((a) => ({ ...a, label: a.area })),
+      { param: "area", clear: ["ceco"] }
+    ),
+    plant: groupChart("plant", "Horas extra por planta", charts.byPlant, {
+      param: "planta",
+      clear: ["direccion", "area", "ceco", "jefe"],
+    }),
+    direccion: groupChart("direccion", "Horas extra por dirección", charts.byDireccion, {
+      param: "direccion",
+      clear: ["area", "ceco", "jefe"],
+    }),
+  };
+  const chartBlocks = ROLE_CHARTS[role]
+    .map((k) => CHARTS[k])
+    .filter((c): c is { key: ChartKey; node: React.ReactNode } => c !== null);
+
+  const showHeatmap = role !== "jefe" || charts.heatmap.areas.length >= 2;
 
   return (
     <DrawerProvider
@@ -136,324 +304,165 @@ export function DashboardView({
       roleParam={roleParam}
       query={query}
     >
-      <div className="space-y-6">
-        <header className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-4 motion-safe:animate-fade-in sm:px-6 sm:py-5">
-          <FigureCluster />
-          <div className="relative flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="mb-1 inline-flex items-center gap-2">
-                <span className="rounded-full bg-brand px-2.5 py-0.5 text-[11px] font-semibold text-white">
-                  {ROLE_FOCUS[role].tag}
-                </span>
+      <DashboardNavProvider>
+        <div className="space-y-5 sm:space-y-6">
+          {/* Estado del mes: la respuesta en 5 segundos. */}
+          <MonthHero
+            roleTag={ROLE_FOCUS[role].tag}
+            scopeLabel={scopeLabel}
+            focus={ROLE_FOCUS[role].focus}
+            period={info.hero}
+            counts={{ red: summary.red, yellow: summary.yellow, green: summary.green }}
+            riskByTarget={summary.riskByTarget}
+            riskByProjection={summary.riskByProjection}
+            notice={heroNotice(role, statuses, summary, reviewHref)}
+            toolbar={toolbar}
+          />
+
+          {/* Buscar y filtrar la vista. */}
+          <div className="reveal print:hidden" style={{ "--i": 1 } as React.CSSProperties}>
+            <EmployeeSearch
+              rows={statuses}
+              hrefBase={hrefBase}
+              roleParam={roleParam}
+              query={query}
+            />
+          </div>
+          {filterOptions && filters && (
+            <DashboardFilters options={filterOptions} current={filters} />
+          )}
+
+          <DataRegion
+            className="space-y-5 sm:space-y-6"
+            doneMessage={`Panel actualizado: ${summary.totalEmployees} persona${summary.totalEmployees === 1 ? "" : "s"} en la vista.`}
+          >
+            {noData && (
+              <div className="card flex items-start gap-3">
+                <span aria-hidden className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full bg-line-strong" />
+                <div>
+                  <p className="text-ui font-semibold text-heading">
+                    Sin datos cargados para este mes
+                  </p>
+                  <p className="mt-1 text-small text-ink-2">
+                    Cuando Recursos Humanos cargue el archivo del biométrico, aquí aparecerán el
+                    acumulado, la meta y las alertas.
+                  </p>
+                </div>
               </div>
-              <h1 className="text-2xl font-bold text-brand-dark">Panel de control</h1>
-              <p className="text-sm text-slate-600">
-                {scopeLabel} · {info.main}
-              </p>
-              <p className="mt-1 max-w-[65ch] text-[15px] leading-relaxed text-slate-600">
-                {ROLE_FOCUS[role].focus}
-              </p>
-            </div>
-            {toolbar && <div className="flex items-center gap-2">{toolbar}</div>}
-          </div>
-        </header>
+            )}
 
-        {/* Cómo leer el panel: la regla que manda y los estados como accesos directos. */}
-        <LegendStrip
-          counts={{ green: summary.green, yellow: summary.yellow, red: summary.red }}
-        />
-
-        {/* Buscador rápido de empleados (typeahead). */}
-        <EmployeeSearch
-          rows={statuses}
-          hrefBase={hrefBase}
-          roleParam={roleParam}
-          query={query}
-        />
-
-        {filterOptions && filters && (
-          <DashboardFilters options={filterOptions} current={filters} />
-        )}
-
-        {noData && (
-          <div className="card text-center">
-            <p className="text-sm font-medium text-brand-dark">Sin datos cargados para este mes</p>
-            <p className="mt-1 text-sm text-slate-600">
-              Cuando Recursos Humanos cargue el archivo del biométrico, aquí aparecerán el
-              acumulado, la meta y las alertas.
-            </p>
-          </div>
-        )}
-
-        {/* KPIs: cada uno abre a la derecha la lista de personas que lo componen. */}
-        <section className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
-          <KpiCard
-            label="Personas en riesgo"
-            value={summary.yellow}
-            tone={summary.yellow > 0 ? "yellow" : "default"}
-            hint={
-              summary.yellow > 0
-                ? `${summary.riskByTarget} sobre la meta · ${summary.riskByProjection} por proyección`
-                : "Nadie va por encima de la meta"
-            }
-            segment="yellow"
-            delay={0}
-          />
-          <KpiCard
-            label={`Excedieron ${RULES.MONTHLY_OVERTIME_LIMIT}h`}
-            value={summary.red}
-            tone={summary.red > 0 ? "red" : "default"}
-            hint={`Más de ${RULES.MONTHLY_OVERTIME_LIMIT}h extra en el mes`}
-            segment="red"
-            delay={50}
-          />
-          <KpiCard
-            label="Horas extra del mes"
-            value={fmtH(summary.totalMonthlyOvertime)}
-            hint={`${summary.totalEmployees} persona${summary.totalEmployees === 1 ? "" : "s"} en la vista`}
-            segment="all"
-            delay={100}
-          />
-          <KpiCard
-            label={`Semanas por encima de ${RULES.WEEKLY_OVERTIME_LIMIT}h`}
-            value={summary.weeklyHigh}
-            hint={
-              summary.weeklyHigh > 0
-                ? `De ${summary.weeklyHighPeople} persona${summary.weeklyHighPeople === 1 ? "" : "s"} · lunes a domingo · informativo`
-                : "Lunes a domingo · informativo"
-            }
-            segment="weeklyHigh"
-            delay={150}
-          />
-          <KpiCard
-            label="Registros por revisar"
-            value={summary.withErrors}
-            tone={summary.withErrors > 0 ? "violet" : "default"}
-            hint="Turnos de más de 16h sin salida, congelados"
-            segment="errors"
-            delay={200}
-          />
-        </section>
-
-        {/* Centro de alertas: cada alerta es una fila desplegable. */}
-        <AlertsCenter
-          delay={300}
-          reviewHref={
-            role === "rrhh" || role === "demo"
-              ? `${hrefBase.replace(/\/empleado$/, "/revisiones")}${roleParam ? `?rol=${roleParam}` : ""}`
-              : undefined
-          }
-        />
-
-        {/* Gráficos */}
-        <CollapsibleCard
-          title="Gráficos y distribución"
-          subtitle="Toque cualquier barra, estado o persona: el detalle se abre a la derecha."
-          delay={350}
-        >
-          <div className="grid gap-5 lg:grid-cols-2">
-            <div className="rounded-lg border border-slate-100 p-4">
-              <h3 className="mb-4 text-sm font-semibold text-brand-dark">
-                Distribución del estado
-              </h3>
-              <DonutChart
-                centerLabel="empleados"
-                segments={[
-                  { label: "Normal", value: summary.green, color: "#16a34a", segment: "green" },
-                  { label: "En riesgo", value: summary.yellow, color: "#FF8400", segment: "yellow" },
-                  { label: "Excedido", value: summary.red, color: "#dc2626", segment: "red" },
-                ]}
+            {/* KPIs: cada uno abre a la derecha la lista de personas que lo
+                componen. No repiten el semáforo del encabezado. */}
+            <section aria-label="Indicadores del mes" className="reveal-stagger grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+              <KpiCard
+                className="col-span-2 sm:col-span-1"
+                label="Horas extra del mes"
+                value={summary.totalMonthlyOvertime}
+                decimals={1}
+                suffix="h"
+                icon="clock"
+                hint={
+                  summary.totalEmployees > 0
+                    ? `Promedio de ${fmtH(perPerson)} por persona`
+                    : "Sin personas en la vista"
+                }
+                segment="all"
               />
-            </div>
-
-            <div className="rounded-lg border border-slate-100 p-4">
-              <h3 className="mb-1 text-sm font-semibold text-brand-dark">
-                Horas extra por tramo del mes
-              </h3>
-              <p className="mb-3 text-xs text-slate-500">
-                Suma de la vista en cada tramo · los tramos parciales tienen menos días
-              </p>
-              <TrendChart
-                points={charts.trend
-                  .filter((w) => !w.future)
-                  .map((w) => ({ label: w.short, value: w.overtime }))}
+              <KpiCard
+                label={`Semanas de más de ${RULES.WEEKLY_OVERTIME_LIMIT}h`}
+                value={summary.weeklyHigh}
+                tone={summary.weeklyHigh > 0 ? "info" : "default"}
+                icon="calendar"
+                hint={
+                  summary.weeklyHigh > 0
+                    ? `De ${summary.weeklyHighPeople} persona${summary.weeklyHighPeople === 1 ? "" : "s"} · informativo`
+                    : "Lunes a domingo · informativo"
+                }
+                segment="weeklyHigh"
               />
-            </div>
-
-            <div className="rounded-lg border border-slate-100 p-4">
-              <h3 className="mb-4 text-sm font-semibold text-brand-dark">
-                Horas extra por área <span className="font-normal text-slate-500">· toque para ver detalle</span>
-              </h3>
-              <HBarChart
-                drill={{ param: "area", clear: ["ceco"] }}
-                items={charts.byArea.map((a) => ({
-                  label: a.area,
-                  value: a.overtime,
-                  sublabel: groupSub(a),
-                }))}
+              <KpiCard
+                label="Registros por revisar"
+                value={summary.withErrors}
+                tone={summary.withErrors > 0 ? "pending" : "default"}
+                icon="review"
+                hint={
+                  isRrhh
+                    ? `Turnos de más de ${RULES.ORPHAN_SHIFT_HOURS}h sin salida, congelados`
+                    : "Los revisa Recursos Humanos; el estado puede cambiar"
+                }
+                segment="errors"
               />
-            </div>
+            </section>
 
-            <div className="rounded-lg border border-slate-100 p-4">
-              <h3 className="mb-4 text-sm font-semibold text-brand-dark">
-                Top empleados por horas extra
-              </h3>
-              <HBarChart
-                items={charts.topEmployees.map((t) => ({
-                  label: t.name,
-                  value: t.overtime,
-                  level: t.level,
-                  sublabel: t.area,
-                  href: empLink(t.id),
-                  employeeId: t.id,
-                }))}
-              />
-            </div>
+            {/* Centro de alertas: cada alerta es una fila desplegable. */}
+            <AlertsCenter reviewHref={reviewHref} role={role} />
 
-            <div className="rounded-lg border border-slate-100 p-4">
-              <h3 className="mb-4 text-sm font-semibold text-brand-dark">
-                Horas extra por planta <span className="font-normal text-slate-500">· toque para ver detalle</span>
-              </h3>
-              <HBarChart
-                color="#00CBBF"
-                drill={{ param: "planta", clear: ["direccion", "area", "ceco", "jefe"] }}
-                items={charts.byPlant.map((g) => ({
-                  label: g.label,
-                  value: g.overtime,
-                  sublabel: groupSub(g),
-                }))}
-              />
-            </div>
+            {/* Semanas del calendario: elegir una semana y filtrar a las personas. */}
+            {!noData && (
+              <CollapsibleCard
+                id="semanas"
+                title="Por semanas del calendario"
+                subtitle="Elija una semana (lunes a domingo, recortada al mes) o vea todo el mes en una matriz. Toque una persona para ver su detalle."
+              >
+                <WeeklyView
+                  statuses={statuses}
+                  segmentsByEmployee={charts.segmentsByEmployee}
+                  trend={charts.trend}
+                />
+              </CollapsibleCard>
+            )}
 
-            <div className="rounded-lg border border-slate-100 p-4">
-              <h3 className="mb-4 text-sm font-semibold text-brand-dark">
-                Horas extra por dirección <span className="font-normal text-slate-500">· toque para ver detalle</span>
-              </h3>
-              <HBarChart
-                color="#003865"
-                drill={{ param: "direccion", clear: ["area", "ceco", "jefe"] }}
-                items={charts.byDireccion.map((g) => ({
-                  label: g.label,
-                  value: g.overtime,
-                  sublabel: groupSub(g),
-                }))}
-              />
-            </div>
-          </div>
-        </CollapsibleCard>
-
-        {/* Heatmap área × tramo */}
-        <CollapsibleCard
-          title="Mapa de calor · horas por persona, por área y tramo"
-          delay={400}
-          subtitle="Cada celda compara las horas por persona del área con la meta del tramo. ▲ = por encima de la meta."
-          defaultOpen={false}
-        >
-          <Heatmap data={charts.heatmap} />
-        </CollapsibleCard>
-
-        {/* Proyección de cierre + reincidentes */}
-        <CollapsibleCard
-          title="En riesgo y reincidentes"
-          delay={450}
-          subtitle="Quién va por encima de la meta o cerraría por encima de 48h, y quién repite semanas de más de 12h."
-          defaultOpen={false}
-        >
-          <div className="grid gap-5 lg:grid-cols-2">
-            <div className="rounded-lg border border-slate-100 p-4">
-              <h3 className="mb-3 text-sm font-semibold text-brand-dark">
-                En riesgo
-              </h3>
-              {atRisk.length === 0 ? (
-                <p className="py-4 text-center text-sm text-slate-500">
-                  Nadie va por encima de la meta ni proyecta superar {RULES.MONTHLY_OVERTIME_LIMIT}h.
-                </p>
-              ) : (
-                <ul className="divide-y divide-slate-100 text-sm">
-                  {atRisk.map((s) => (
-                    <li key={s.id} className="flex items-center gap-2 py-2.5">
-                      <EmployeeLink
-                        id={s.id}
-                        href={empLink(s.id)}
-                        className="min-w-0 truncate font-medium text-brand-dark hover:underline"
-                      >
-                        {s.name ?? s.code}
-                      </EmployeeLink>
-                      <span className="hidden truncate text-xs text-slate-500 sm:block">
-                        {s.area}
-                      </span>
-                      <span className="ml-auto shrink-0 text-right tabular-nums text-slate-600">
-                        {s.risk === "meta" ? (
-                          <>
-                            {fmtH(s.monthlyOvertime)}{" "}
-                            <span className="font-semibold text-status-yellow">
-                              (+{fmtH(s.overTarget)} meta)
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            {fmtH(s.monthlyOvertime)} →{" "}
-                            <span className="font-semibold text-status-yellow">
-                              ≈{fmtH(s.projectedMonthlyOvertime)}
-                            </span>
-                          </>
-                        )}
-                      </span>
-                    </li>
+            {/* Gráficos, en el orden que más le sirve a cada rol. */}
+            {chartBlocks.length > 0 && (
+              <CollapsibleCard
+                title="Gráficos y distribución"
+                subtitle="Toque cualquier barra o persona: el detalle se abre a la derecha."
+              >
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {chartBlocks.map((c, i) => (
+                    <article
+                      key={c.key}
+                      className={
+                        "min-w-0 rounded-card border border-line p-4" +
+                        (i === chartBlocks.length - 1 && chartBlocks.length % 2 === 1
+                          ? " lg:col-span-2"
+                          : "")
+                      }
+                    >
+                      {c.node}
+                    </article>
                   ))}
-                </ul>
-              )}
-            </div>
+                </div>
+              </CollapsibleCard>
+            )}
 
-            <div className="rounded-lg border border-slate-100 p-4">
-              <h3 className="mb-3 text-sm font-semibold text-brand-dark">
-                Reincidentes · 2 o más semanas de más de {RULES.WEEKLY_OVERTIME_LIMIT}h
-              </h3>
-              {charts.reincidentes.length === 0 ? (
-                <p className="py-4 text-center text-sm text-slate-500">
-                  Sin reincidentes este mes.
-                </p>
-              ) : (
-                <ul className="divide-y divide-slate-100 text-sm">
-                  {charts.reincidentes.map((r) => (
-                    <li key={r.id} className="flex items-center gap-2 py-2.5">
-                      <EmployeeLink
-                        id={r.id}
-                        href={empLink(r.id)}
-                        className="min-w-0 truncate font-medium text-brand-dark hover:underline"
-                      >
-                        {r.name}
-                      </EmployeeLink>
-                      <StatusBadge level={r.level} />
-                      <span className="ml-auto shrink-0 text-xs font-medium text-slate-600">
-                        {r.weeksHigh} semanas &gt; {RULES.WEEKLY_OVERTIME_LIMIT}h
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        </CollapsibleCard>
+            {/* Mapa de calor área × tramo (se monta al abrirlo). */}
+            {showHeatmap && (
+              <CollapsibleCard
+                title="Mapa de calor · horas por persona, por área y tramo"
+                subtitle="Cada celda compara las horas por persona del área con la meta del tramo. ▲ = por encima de la meta."
+                defaultOpen={role === "director"}
+                lazy
+              >
+                <Heatmap data={charts.heatmap} />
+              </CollapsibleCard>
+            )}
 
-        <CollapsibleCard
-          title="Detalle por empleado"
-          subtitle="Busque, filtre por estado y toque una fila para ver el detalle a la derecha."
-          delay={550}
-          badge={
-            <span className="rounded-full bg-brand-tint px-2.5 py-1 text-xs font-medium text-brand-dark">
-              {statuses.length} personas
-            </span>
-          }
-        >
-          <FilterableEmployeeTable
-            rows={statuses}
-            hrefBase={hrefBase}
-            roleParam={roleParam}
-            query={query}
-          />
-        </CollapsibleCard>
-      </div>
+            <CollapsibleCard
+              id="detalle"
+              title="Detalle por empleado"
+              subtitle="Busque, filtre por estado y toque una fila para ver el detalle a la derecha."
+            >
+              <FilterableEmployeeTable
+                rows={statuses}
+                hrefBase={hrefBase}
+                roleParam={roleParam}
+                query={query}
+              />
+            </CollapsibleCard>
+          </DataRegion>
+        </div>
+      </DashboardNavProvider>
     </DrawerProvider>
   );
 }
